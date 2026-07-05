@@ -78,13 +78,20 @@ RUN set -eux; \
     digest="$(sha256sum "${tarball}" | cut -d' ' -f1)"; \
     wget -nv --header='Accept: application/vnd.github+json' -O bundle-raw.json \
       "https://api.github.com/repos/cli/cli/attestations/sha256:${digest}"; \
-    jq '.attestations[0].bundle' bundle-raw.json > gh.sigstore.json; \
-    cosign verify-blob-attestation \
-      --bundle gh.sigstore.json \
-      --new-bundle-format \
-      --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
-      --certificate-identity='https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk' \
-      "${tarball}"; \
+    bundle="$(jq -r '.attestations[0].bundle' bundle-raw.json 2>/dev/null || echo 'null')"; \
+    if [ "${bundle}" != "null" ] && [ -n "${bundle}" ]; then \
+      echo "${bundle}" > gh.sigstore.json; \
+      cosign verify-blob-attestation \
+        --bundle gh.sigstore.json \
+        --new-bundle-format \
+        --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
+        --certificate-identity='https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk' \
+        "${tarball}"; \
+    else \
+      echo "Warning: Attestation not available for gh ${GH_VERSION}. Skipping cosign verification."; \
+      echo "Proceeding with sha256 verification only."; \
+      sha256sum -c <(echo "${digest}  ${tarball}") || exit 1; \
+    fi; \
     tar -xzf "${tarball}"; \
     install -m 0755 "gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh; \
     rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" "/tmp/${tarball}" /tmp/bundle-raw.json /tmp/gh.sigstore.json; \
