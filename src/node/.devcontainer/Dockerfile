@@ -90,7 +90,7 @@ RUN set -eux; \
     else \
       echo "Warning: Attestation not available for gh ${GH_VERSION}. Skipping cosign verification."; \
       echo "Proceeding with sha256 verification only."; \
-      sha256sum -c <(echo "${digest}  ${tarball}") || exit 1; \
+      echo "${digest}  ${tarball}" | sha256sum -c; \
     fi; \
     tar -xzf "${tarball}"; \
     install -m 0755 "gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh; \
