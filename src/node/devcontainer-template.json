@@ -1,13 +1,26 @@
 {
   "id": "node",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Node — pinned toolchain, provenance-verified, with Claude Code",
   "description": "A reproducible Node dev container: digest-pinned node base, pnpm, prek, and a GitHub CLI verified via SLSA build provenance (cosign), plus zsh and the Claude Code feature. Ships an optional renovate.json wired to a shared preset.",
   "documentationURL": "https://github.com/andykenward/devcontainer-templates/tree/main/src/node",
   "licenseURL": "https://github.com/andykenward/devcontainer-templates/blob/main/LICENSE",
   "options": {},
-  "platforms": ["Node.js", "TypeScript", "JavaScript"],
+  "platforms": [
+    "Node.js",
+    "TypeScript",
+    "JavaScript"
+  ],
   "publisher": "andykenward",
-  "keywords": ["node", "pnpm", "gh", "prek", "claude-code", "zsh"],
-  "optionalPaths": ["renovate.json"]
+  "keywords": [
+    "node",
+    "pnpm",
+    "gh",
+    "prek",
+    "claude-code",
+    "zsh"
+  ],
+  "optionalPaths": [
+    "renovate.json"
+  ]
 }
