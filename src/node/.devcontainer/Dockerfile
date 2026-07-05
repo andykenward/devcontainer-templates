@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # TARGETARCH is supplied by BuildKit, so this works on amd64 and arm64.
-# PREK_IMAGE is pinned by digest for reproducibility.
 ARG TARGETARCH
-ARG PREK_IMAGE=ghcr.io/j178/prek:v0.4.3@sha256:953593c93d253d44bad97b36b428c13edd074dc35de003ccbf3ff9a40c0c79b9
 
 # Base image pinned by digest for reproducibility. Bumping the node version
 # means updating both the tag and the digest — Renovate's Dockerfile manager
@@ -105,8 +103,7 @@ RUN set -eux; \
 # distroless image. Content-addressed: if the tag were force-pushed, the digest
 # would not match and the build fails closed. Renovate's Dockerfile manager
 # bumps the tag+digest.
-FROM --platform=linux/${TARGETARCH:-amd64} ${PREK_IMAGE} AS prek-stage
-COPY --from=prek-stage /prek /usr/local/bin/prek
+COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:953593c93d253d44bad97b36b428c13edd074dc35de003ccbf3ff9a40c0c79b9 /prek /usr/local/bin/prek
 
 # Drop to the non-root `node` user as the image default. devcontainer.json also
 # sets `remoteUser: node` for VS Code, but this also covers plain

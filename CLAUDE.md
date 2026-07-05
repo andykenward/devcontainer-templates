@@ -88,10 +88,11 @@ doesn't auto-create empty directories in their place. Lifecycle commands are gua
   scripts should not attempt `sudo chmod` or other privileged operations. Either run as root
   or use alternative approaches (e.g., `bash script.sh` instead of `./script.sh` with chmod).
 - **Explicitly set platform for multi-platform COPY --from**: When copying binaries from
-  multi-platform images (e.g., `prek`, `cosign`), use a named intermediate stage with
-  `FROM --platform=linux/${TARGETARCH:-amd64}` followed by `COPY --from=stage-name`.
-  The `--platform` flag is not valid on `COPY --from` itself, but can be used on `FROM`.
-  Declare `ARG TARGETARCH` and any image ARGs globally (before any FROM) so they're available to all stages.
+  multi-platform images (e.g., `prek`, `cosign`), Docker may pull the wrong architecture.
+  A platform mismatch warning is expected but often harmless. Using an intermediate stage with
+  `FROM --platform` to handle this can create circular dependencies when the devcontainer CLI
+  tries to build the intermediate stage as a target. Verify at smoke test time if the binary works
+  despite the warning, or pre-build with the correct architecture.
 
 ## Common pitfalls when editing `.github/workflows/test.yaml`
 
