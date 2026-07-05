@@ -75,3 +75,20 @@ The template's `devcontainer.json` bind-mounts host credentials (`~/.claude`, `~
 read-only, `~/.config/gh` read-only) and its `initializeCommand` `touch`/`mkdir`s them so Docker
 doesn't auto-create empty directories in their place. Lifecycle commands are guarded with
 `if [ -f package.json ]` so applying into an empty/non-JS repo doesn't fail.
+
+## Common pitfalls when editing the Dockerfile
+
+- **Attestation API responses may be unavailable**: The GitHub CLI verification step fetches
+  attestations from the GitHub API. Not all releases have available attestations. Always include
+  error handling (jq returns `null` if missing) with a fallback to SHA256 verification instead
+  of failing closed. See the `gh` installation RUN block.
+- **Use POSIX shell syntax, not bash**: The Dockerfile runs under `/bin/sh`. Avoid bash-only
+  syntax like process substitution `<(...)`. Use pipes `echo ... | command` instead.
+- **The container has no `sudo`**: The image runs as non-root `node` by design. Tests and
+  scripts should not attempt `sudo chmod` or other privileged operations. Either run as root
+  or use alternative approaches (e.g., `bash script.sh` instead of `./script.sh` with chmod).
+
+## Common pitfalls when editing `.github/workflows/test.yaml`
+
+- **Use `bash script.sh` instead of `./script.sh`**: The container is non-root and has no sudo.
+  Run test scripts with `bash` rather than relying on execute permissions and chmod.
