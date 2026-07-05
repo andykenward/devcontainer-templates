@@ -91,7 +91,7 @@ doesn't auto-create empty directories in their place. Lifecycle commands are gua
   multi-platform images (e.g., `prek`, `cosign`), use a named intermediate stage with
   `FROM --platform=linux/${TARGETARCH:-amd64}` followed by `COPY --from=stage-name`.
   The `--platform` flag is not valid on `COPY --from` itself, but can be used on `FROM`.
-  Declare `ARG TARGETARCH` globally (before any FROM) so it's available to all stages.
+  Declare `ARG TARGETARCH` and any image ARGs globally (before any FROM) so they're available to all stages.
 
 ## Common pitfalls when editing `.github/workflows/test.yaml`
 
