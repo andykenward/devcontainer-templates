@@ -25,7 +25,9 @@
 		// Claude Code credentials — read-only so container processes can't tamper with host auth.
 		"source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,readonly",
 		// Claude Code working state (projects, todos, memory) — must be writable.
-		"source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind"
+		"source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+		// GitHub CLI credentials — read-only; re-auth on the host with `gh auth login`.
+		"source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,readonly"
 	],
 	"remoteUser": "node"
 }
