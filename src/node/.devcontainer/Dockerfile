@@ -100,8 +100,8 @@ RUN set -eux; \
 # prek — pre-commit hook manager, copied from the official digest-pinned
 # distroless image. Content-addressed: if the tag were force-pushed, the digest
 # would not match and the build fails closed. Renovate's Dockerfile manager
-# bumps the tag+digest.
-COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:953593c93d253d44bad97b36b428c13edd074dc35de003ccbf3ff9a40c0c79b9 /prek /usr/local/bin/prek
+# bumps the tag+digest. Explicitly set platform to match TARGETARCH.
+COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:953593c93d253d44bad97b36b428c13edd074dc35de003ccbf3ff9a40c0c79b9 --platform=linux/${TARGETARCH:-amd64} /prek /usr/local/bin/prek
 
 # Drop to the non-root `node` user as the image default. devcontainer.json also
 # sets `remoteUser: node` for VS Code, but this also covers plain

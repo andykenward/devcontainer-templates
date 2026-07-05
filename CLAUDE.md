@@ -87,6 +87,10 @@ doesn't auto-create empty directories in their place. Lifecycle commands are gua
 - **The container has no `sudo`**: The image runs as non-root `node` by design. Tests and
   scripts should not attempt `sudo chmod` or other privileged operations. Either run as root
   or use alternative approaches (e.g., `bash script.sh` instead of `./script.sh` with chmod).
+- **Explicitly set platform for multi-platform COPY --from**: When copying binaries from
+  multi-platform images (e.g., `prek`, `cosign`), use `--platform=linux/${TARGETARCH:-amd64}`
+  to ensure Docker pulls the binary for the correct architecture. Otherwise you may get a
+  platform mismatch (e.g., arm64 binary when expecting amd64).
 
 ## Common pitfalls when editing `.github/workflows/test.yaml`
 
