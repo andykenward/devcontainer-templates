@@ -4,7 +4,8 @@
 		"ghcr.io/devcontainers/features/docker-in-docker:4": {
 			"moby": "false"
 		},
-		"ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+		"ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
 	"containerEnv": {
 		"CLAUDE_CONFIG_DIR": "/home/node/.claude",
