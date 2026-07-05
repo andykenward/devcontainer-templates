@@ -1,0 +1,73 @@
+// Dev Container config dropped into a project by the `node` template.
+// Reference: https://containers.dev/implementors/json_reference
+{
+  "name": "${localWorkspaceFolderBasename}",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "customizations": {
+    "vscode": {
+      // Versions intentionally unpinned. `extensions.autoUpdate` is disabled
+      // below, so each machine freezes at whatever it first installs — stable
+      // in practice without version strings to maintain.
+      "extensions": [
+        "eamodio.gitlens",
+        "github.vscode-github-actions",
+        "GraphQL.vscode-graphql-syntax",
+        "GraphQL.vscode-graphql",
+        "oxc.oxc-vscode",
+        "vitest.explorer",
+        "webpro.vscode-knip"
+      ],
+      "settings": {
+        "chat.disableAIFeatures": true,
+        "extensions.autoUpdate": false,
+        "extensions.autoCheckUpdates": true,
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/usr/bin/zsh"
+          }
+        }
+      }
+    }
+  },
+
+  // Lifecycle commands are guarded so applying this template into an empty or
+  // non-JS repo does not fail on first build.
+  "postCreateCommand": "bash -c 'if [ -f package.json ]; then pnpm i; fi; if [ -f .pre-commit-config.yaml ]; then prek install; fi'",
+  "updateContentCommand": "bash -c 'rm -rf .cache; if [ -f package.json ]; then pnpm i; fi; if [ -f .pre-commit-config.yaml ]; then prek install; fi'",
+
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {}
+  },
+
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "DISABLE_AUTOUPDATER": "1"
+  },
+
+  // Ensure mount sources exist on the host before the container starts. Without
+  // this, Docker auto-creates an empty *directory* at the .claude.json path
+  // (since the source is missing), which breaks Claude Code. See README for
+  // host setup requirements.
+  "initializeCommand": "touch ${localEnv:HOME}/.claude.json && mkdir -p ${localEnv:HOME}/.claude ${localEnv:HOME}/.config/gh",
+
+  "mounts": [
+    // Claude Code credentials — read-only so container processes can't tamper
+    // with host auth.
+    "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,readonly",
+    // Claude Code working state (projects, todos, memory) — must be writable.
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+    // GitHub CLI credentials — read-only; re-auth on the host with `gh auth login`.
+    "source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,readonly",
+    // Per-project named volume for persistent zsh history across rebuilds.
+    // Derived from the folder name so each project gets its own history.
+    "source=${localWorkspaceFolderBasename}-zsh-history,target=/commandhistory,type=volume"
+  ],
+
+  // Connect as the non-root `node` user (the Dockerfile's default USER). Set to
+  // "root" to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  "remoteUser": "node"
+}
