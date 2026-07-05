@@ -87,12 +87,19 @@ doesn't auto-create empty directories in their place. Lifecycle commands are gua
 - **The container has no `sudo`**: The image runs as non-root `node` by design. Tests and
   scripts should not attempt `sudo chmod` or other privileged operations. Either run as root
   or use alternative approaches (e.g., `bash script.sh` instead of `./script.sh` with chmod).
-- **Explicitly set platform for multi-platform COPY --from**: When copying binaries from
-  multi-platform images (e.g., `prek`, `cosign`), Docker may pull the wrong architecture.
-  A platform mismatch warning is expected but often harmless. Using an intermediate stage with
-  `FROM --platform` to handle this can create circular dependencies when the devcontainer CLI
-  tries to build the intermediate stage as a target. Verify at smoke test time if the binary works
-  despite the warning, or pre-build with the correct architecture.
+- **Pin `COPY --from` images to the multi-arch index digest, not an arch-specific one**: When
+  copying binaries from multi-platform images (e.g., `prek`), the pinned `@sha256:` MUST be the
+  manifest-list/index digest. Given the index, BuildKit resolves `COPY --from` to the manifest
+  matching the build's platform, so amd64 and arm64 each get the right binary. If the digest points
+  at a single arch's manifest, that one binary is copied onto *every* platform (e.g. an arm64 `prek`
+  onto an amd64 image) and fails to execute at runtime — this is exactly what broke the `prek`
+  smoke test. Verify with `docker buildx imagetools inspect <ref>`: the index shows
+  `MediaType: application/vnd.oci.image.index.v1+json` and lists multiple platforms; an
+  arch-specific manifest shows `image.manifest.v1+json` and a single platform.
+  Do **not** fix this with an intermediate `FROM --platform ... AS stage` before the `COPY` — a
+  stage defined *after* the main image whose own `COPY --from` references itself becomes the last
+  stage, and the devcontainer CLI then targets it and hits a circular dependency. The index-digest
+  approach on a plain `COPY --from` needs no extra stage.
 
 ## Common pitfalls when editing `.github/workflows/test.yaml`
 

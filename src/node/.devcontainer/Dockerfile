@@ -103,7 +103,14 @@ RUN set -eux; \
 # distroless image. Content-addressed: if the tag were force-pushed, the digest
 # would not match and the build fails closed. Renovate's Dockerfile manager
 # bumps the tag+digest.
-COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:953593c93d253d44bad97b36b428c13edd074dc35de003ccbf3ff9a40c0c79b9 /prek /usr/local/bin/prek
+#
+# The digest MUST be the multi-arch index (manifest list) digest, not an
+# arch-specific manifest digest. With the index, BuildKit resolves COPY --from
+# to the manifest matching the build's platform, so amd64 and arm64 each get the
+# right binary. Pinning an arch-specific digest here copies that one arch's
+# binary onto every platform (e.g. an arm64 prek onto an amd64 image), and it
+# fails to execute at runtime — the `prek --version` smoke test catches this.
+COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:ef02821aae78d53bf766e2764641b62b5fb7cf3a2394147395f0bf4105e30484 /prek /usr/local/bin/prek
 
 # Drop to the non-root `node` user as the image default. devcontainer.json also
 # sets `remoteUser: node` for VS Code, but this also covers plain
