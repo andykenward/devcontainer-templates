@@ -14,9 +14,10 @@ menu — it has **no picker options**.
   distroless images (no install script runs).
 - **zsh**: hand-rolled config (history on a named volume, autosuggestions,
   `vcs_info` prompt) — no oh-my-zsh.
-- **Claude Code**: installed via the Anthropic feature, with host credentials
-  bind-mounted (`~/.claude`, `~/.claude.json`) and `gh` credentials shared
-  read-only from `~/.config/gh`.
+- **Claude Code**: installed with Anthropic's official native installer, pinned
+  to a specific version (no npm dependency, no unpinned `curl | bash`), with host
+  credentials bind-mounted (`~/.claude`, `~/.claude.json`) and `gh` credentials
+  shared read-only from `~/.config/gh`.
 - **Optional `renovate.json`**: applying the template offers to drop a root
   `renovate.json` that extends the shared
   [`andykenward/renovate-config`](https://github.com/andykenward/renovate-config)

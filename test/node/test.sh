@@ -17,6 +17,7 @@ check() {
 }
 
 check "node"   node --version
+check "claude" claude --version
 check "pnpm"   pnpm --version
 check "gh"     gh --version
 check "prek"   prek --version

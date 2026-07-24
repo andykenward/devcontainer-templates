@@ -12,6 +12,7 @@
       // below, so each machine freezes at whatever it first installs — stable
       // in practice without version strings to maintain.
       "extensions": [
+        "anthropic.claude-code",
         "eamodio.gitlens",
         "github.vscode-github-actions",
         "GraphQL.vscode-graphql-syntax",
@@ -38,10 +39,6 @@
   // non-JS repo does not fail on first build.
   "postCreateCommand": "bash -c 'if [ -f package.json ]; then pnpm i; fi; if [ -f .pre-commit-config.yaml ]; then prek install; fi'",
   "updateContentCommand": "bash -c 'rm -rf .cache; if [ -f package.json ]; then pnpm i; fi; if [ -f .pre-commit-config.yaml ]; then prek install; fi'",
-
-  "features": {
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {}
-  },
 
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
