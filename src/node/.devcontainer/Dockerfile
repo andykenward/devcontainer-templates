@@ -71,7 +71,7 @@ COPY --from=ghcr.io/sigstore/cosign/cosign:v3.1.2@sha256:d91bc4e7e95e8d2f549c747
 #   - GH_VERSION is bumped by Renovate (github-releases custom manager).
 #   - If cli/cli change their release workflow path/ref, a version bump will
 #     fail verification here — update --certificate-identity to match.
-ARG GH_VERSION=2.95.0
+ARG GH_VERSION=2.96.0
 RUN set -eux; \
     arch="${TARGETARCH:-amd64}"; \
     tarball="gh_${GH_VERSION}_linux_${arch}.tar.gz"; \
