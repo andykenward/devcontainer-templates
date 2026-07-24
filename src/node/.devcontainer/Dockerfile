@@ -6,7 +6,7 @@ ARG TARGETARCH
 # Base image pinned by digest for reproducibility. Bumping the node version
 # means updating both the tag and the digest — Renovate's Dockerfile manager
 # does both together in one PR.
-FROM node:24.18.0-bookworm-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc
+FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
 
 # System packages. Individual versions are not pinned — the digest-pinned base
 # image plus Docker's layer cache provide reproducibility in practice.
