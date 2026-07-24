@@ -32,15 +32,30 @@ menu — it has **no picker options**.
 
 ## Host prerequisites
 
-The template bind-mounts a few host paths, and `initializeCommand` creates them
-if missing. On the host, authenticate once so the mounts carry real credentials:
+The template bind-mounts a few host paths **read-only**, and `initializeCommand`
+pre-creates them so the container can start — a modern Docker daemon refuses to
+start when a bind source is missing, so this is required, not optional. On the
+host, authenticate once so the mounts carry real credentials instead of the empty
+`{}` stub `initializeCommand` seeds into `~/.claude.json`:
 
 ```sh
 gh auth login          # writes ~/.config/gh
 # Claude Code: sign in once on the host so ~/.claude.json / ~/.claude exist
 ```
 
-macOS/Linux hosts only (the `initializeCommand` uses `touch`/`mkdir`).
+macOS/Linux hosts only (the `initializeCommand` uses `mkdir` and a POSIX shell).
+
+> [!NOTE]
+> **Clone Repository in Container Volume**: with this flow the VS Code server
+> often runs as `root`, so `${localEnv:HOME}` is `/root` and the mount sources
+> resolve to `/root/.claude.json`, `/root/.claude`, `/root/.config/gh`. If the
+> container fails to start with `bind source path does not exist`, create them on
+> that host and reopen:
+>
+> ```sh
+> mkdir -p /root/.claude /root/.config/gh
+> printf '{}' > /root/.claude.json
+> ```
 
 ## Applying it
 

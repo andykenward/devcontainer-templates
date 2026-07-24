@@ -45,11 +45,15 @@
     "DISABLE_AUTOUPDATER": "1"
   },
 
-  // Ensure mount sources exist on the host before the container starts. Without
-  // this, Docker auto-creates an empty *directory* at the .claude.json path
-  // (since the source is missing), which breaks Claude Code. See README for
-  // host setup requirements.
-  "initializeCommand": "touch ${localEnv:HOME}/.claude.json && mkdir -p ${localEnv:HOME}/.claude ${localEnv:HOME}/.config/gh",
+  // Pre-create the bind-mount sources on the host before the container starts.
+  // The mounts below are read-only, and a modern Docker daemon *refuses* to start
+  // a container whose bind source is missing (older daemons silently auto-created
+  // an empty directory instead). So this command is required, not a convenience.
+  // It makes the dirs and seeds .claude.json with valid JSON (`{}`) when it's
+  // absent or empty, so a host that hasn't signed into Claude Code yet still
+  // starts instead of hard-failing on the mount. See README for host setup
+  // (sign in on the host so the mounts carry real credentials).
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.claude ${localEnv:HOME}/.config/gh; [ -s ${localEnv:HOME}/.claude.json ] || printf '{}' > ${localEnv:HOME}/.claude.json",
 
   "mounts": [
     // Claude Code credentials — read-only so container processes can't tamper
