@@ -1,6 +1,6 @@
 {
   "id": "node",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Node — pinned toolchain, provenance-verified, with Claude Code",
   "description": "A reproducible Node dev container: digest-pinned node base, pnpm, prek, and a GitHub CLI verified via SLSA build provenance (cosign), plus zsh and the Claude Code CLI. Ships an optional renovate.json wired to a shared preset.",
   "documentationURL": "https://github.com/andykenward/devcontainer-templates/tree/main/src/node",
