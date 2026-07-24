@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 
 # TARGETARCH is supplied by BuildKit, so this works on amd64 and arm64.
 ARG TARGETARCH
@@ -52,7 +52,7 @@ RUN npm install -g pnpm@11.9.0
 # container can verify other signed artifacts too.
 # NOTE: pinned by tag here; Renovate (:pinDigests) adds and maintains the
 # @sha256 digest on its first run, matching how prek is pinned.
-COPY --from=ghcr.io/sigstore/cosign/cosign:v2.4.1 /ko-app/cosign /usr/local/bin/cosign
+COPY --from=ghcr.io/sigstore/cosign/cosign:v2.4.1@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 /ko-app/cosign /usr/local/bin/cosign
 
 # GitHub CLI — verified by SLSA build provenance instead of apt-key trust.
 # gh is NOT installed from the apt repo. Instead we download the pinned,
