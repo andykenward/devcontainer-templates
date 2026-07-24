@@ -91,10 +91,14 @@ point is reproducibility and supply-chain provenance, so when editing `src/node/
   file's frontmatter `metadata.github-pinned` records the ref). Note `gh skill update` does
   **not** work here — it skips `--pin`ned skills by design.
 
-The template's `devcontainer.json` bind-mounts host credentials (`~/.claude`, `~/.claude.json`
-read-only, `~/.config/gh` read-only) and its `initializeCommand` `touch`/`mkdir`s them so Docker
-doesn't auto-create empty directories in their place. Lifecycle commands are guarded with
-`if [ -f package.json ]` so applying into an empty/non-JS repo doesn't fail.
+The template's `devcontainer.json` mounts **no host paths by default** (only a per-project named
+volume for zsh history), so it starts cleanly on any host and in any Dev Containers flow. Sharing
+host credentials is **opt-in**: three bind mounts (`~/.claude` writable, `~/.claude.json` and
+`~/.config/gh` read-only) ship commented out, and the user uncomments them after authenticating on
+the host — a bind mount requires its source to already exist, and host auth (`gh auth login`, Claude
+Code sign-in) is what creates those sources. There is intentionally no `initializeCommand`: with the
+mounts off there is nothing to pre-create, and the opt-in path relies on host auth instead. Lifecycle
+commands are guarded with `if [ -f package.json ]` so applying into an empty/non-JS repo doesn't fail.
 
 ## Common pitfalls when editing the Dockerfile
 

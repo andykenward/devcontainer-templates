@@ -45,25 +45,28 @@
     "DISABLE_AUTOUPDATER": "1"
   },
 
-  // Pre-create the bind-mount sources on the host before the container starts.
-  // A modern Docker daemon *refuses* to start a container whose bind source is
-  // missing (older daemons silently auto-created an empty directory instead) —
-  // true for writable and read-only binds alike. So this command is required,
-  // not a convenience.
-  // It makes the dirs and seeds .claude.json with valid JSON (`{}`) when it's
-  // absent or empty, so a host that hasn't signed into Claude Code yet still
-  // starts instead of hard-failing on the mount. See README for host setup
-  // (sign in on the host so the mounts carry real credentials).
-  "initializeCommand": "mkdir -p ${localEnv:HOME}/.claude ${localEnv:HOME}/.config/gh; [ -s ${localEnv:HOME}/.claude.json ] || printf '{}' > ${localEnv:HOME}/.claude.json",
-
+  // ── Host credential sharing (optional, OFF by default) ──────────────────
+  // By default this template mounts no host paths, so it starts cleanly on any
+  // host and in any Dev Containers flow.
+  //
+  // To reuse your host Claude Code + gh credentials inside the container,
+  // authenticate once on the host (`gh auth login`, and sign in to Claude Code)
+  // so the source paths exist, then uncomment the three bind mounts below.
+  //
+  // Heads up if you commit them: everyone who opens this repo in a container
+  // then depends on the same host paths. A teammate who hasn't authenticated on
+  // their host will get `bind source path does not exist` on start — they fix it
+  // by authenticating on the host and rebuilding, or by re-commenting the mounts.
   "mounts": [
+    // ── Optional host-credential mounts (see note above) ──
     // Claude Code credentials — read-only so container processes can't tamper
     // with host auth.
-    "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,readonly",
+    // "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,readonly",
     // Claude Code working state (projects, todos, memory) — must be writable.
-    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+    // "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
     // GitHub CLI credentials — read-only; re-auth on the host with `gh auth login`.
-    "source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,readonly",
+    // "source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,readonly",
+
     // Per-project named volume for persistent zsh history across rebuilds.
     // Derived from the folder name so each project gets its own history.
     "source=${localWorkspaceFolderBasename}-zsh-history,target=/commandhistory,type=volume"
