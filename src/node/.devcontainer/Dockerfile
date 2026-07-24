@@ -52,7 +52,7 @@ RUN npm install -g pnpm@11.9.0
 # container can verify other signed artifacts too.
 # NOTE: pinned by tag here; Renovate (:pinDigests) adds and maintains the
 # @sha256 digest on its first run, matching how prek is pinned.
-COPY --from=ghcr.io/sigstore/cosign/cosign:v2.4.1@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 /ko-app/cosign /usr/local/bin/cosign
+COPY --from=ghcr.io/sigstore/cosign/cosign:v3.1.2@sha256:d91bc4e7e95e8d2f549c747a72dc174f90579e410a1695f57f686674f84ce849 /ko-app/cosign /usr/local/bin/cosign
 
 # GitHub CLI — verified by SLSA build provenance instead of apt-key trust.
 # gh is NOT installed from the apt repo. Instead we download the pinned,
