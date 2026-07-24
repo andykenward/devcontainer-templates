@@ -2,5 +2,15 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>andykenward/renovate-config"
+  ],
+  "customManagers": [
+    {
+      "description": "devcontainer CLI pinned in the test workflow (npm install -g @devcontainers/cli@<version>)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["npm install -g @devcontainers/cli@(?<currentValue>\\S+)"],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "@devcontainers/cli"
+    }
   ]
 }
