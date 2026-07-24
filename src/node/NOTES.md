@@ -15,9 +15,9 @@ menu — it has **no picker options**.
 - **zsh**: hand-rolled config (history on a named volume, autosuggestions,
   `vcs_info` prompt) — no oh-my-zsh.
 - **Claude Code**: installed with Anthropic's official native installer, pinned
-  to a specific version (no npm dependency, no unpinned `curl | bash`), with host
-  credentials bind-mounted (`~/.claude`, `~/.claude.json`) and `gh` credentials
-  shared read-only from `~/.config/gh`.
+  to a specific version (no npm dependency, no unpinned `curl | bash`). Sharing
+  your host Claude Code / `gh` credentials into the container is **opt-in** — see
+  [Sharing host credentials](#sharing-host-credentials-optional) below.
 - **`gh` agent skill**: ships the [`gh` agent skill](https://github.com/cli/cli#agent-skills)
   from `cli/cli` as a project-scoped skill at `.claude/skills/gh/`, pinned to the
   same `gh` release as the CLI. It teaches agents (Claude Code and any other
@@ -30,33 +30,44 @@ menu — it has **no picker options**.
   [`andykenward/renovate-config`](https://github.com/andykenward/renovate-config)
   preset, so the applied repo keeps its pins current.
 
-## Host prerequisites
+## Sharing host credentials (optional)
 
-The template bind-mounts a few host paths (some read-only, some writable), and
-`initializeCommand` pre-creates them so the container can start — a modern Docker
-daemon refuses to start when any bind source is missing, so this is required, not
-optional. On the
-host, authenticate once so the mounts carry real credentials instead of the empty
-`{}` stub `initializeCommand` seeds into `~/.claude.json`:
+Out of the box the container mounts **no host paths**, so it starts cleanly on
+any host and in any Dev Containers flow. If you'd like the container to reuse the
+Claude Code and GitHub CLI credentials you're already signed into on the host:
 
-```sh
-gh auth login          # writes ~/.config/gh
-# Claude Code: sign in once on the host so ~/.claude.json / ~/.claude exist
-```
+1. **Authenticate on the host** so the source paths exist and carry real
+   credentials (a bind mount requires its source to already exist):
 
-macOS/Linux hosts only (the `initializeCommand` uses `mkdir` and a POSIX shell).
+   ```sh
+   gh auth login          # writes ~/.config/gh
+   # Claude Code: sign in once on the host so ~/.claude.json / ~/.claude exist
+   ```
 
-> [!NOTE]
-> **Clone Repository in Container Volume**: with this flow the VS Code server
-> often runs as `root`, so `${localEnv:HOME}` is `/root` and the mount sources
-> resolve to `/root/.claude.json`, `/root/.claude`, `/root/.config/gh`. If the
-> container fails to start with `bind source path does not exist`, create them on
-> that host and reopen:
->
-> ```sh
-> mkdir -p /root/.claude /root/.config/gh
-> printf '{}' > /root/.claude.json
-> ```
+2. **Uncomment the three bind mounts** in `.devcontainer/devcontainer.json`
+   (they sit under the "Optional host-credential mounts" note) and rebuild the
+   container. They mount `~/.claude` writable and `~/.claude.json` /
+   `~/.config/gh` read-only.
+
+3. **Keep the change local** (recommended in shared repos) so you don't commit a
+   host-path dependency onto your teammates. There's no per-user override file
+   for `devcontainer.json`, so tell git to ignore your local edit:
+
+   ```sh
+   git update-index --skip-worktree .devcontainer/devcontainer.json
+   # undo later with: git update-index --no-skip-worktree .devcontainer/devcontainer.json
+   ```
+
+macOS/Linux hosts. This works best with the standard **Reopen in Container**
+flow, where `${localEnv:HOME}` resolves to your real host home.
+
+> [!IMPORTANT]
+> **If you commit the uncommented mounts**, everyone who opens the repo in a
+> container inherits the same host-path dependency. A teammate who hasn't signed
+> in on their host will hit `bind source path does not exist` when the container
+> starts. To resolve it, they can either authenticate on their host (step 1) and
+> rebuild, or re-comment the three mounts locally. Prefer keeping them commented
+> in shared repos and letting each person opt in on their own machine.
 
 ## Applying it
 
