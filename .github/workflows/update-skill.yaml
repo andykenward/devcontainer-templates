@@ -1,0 +1,100 @@
+name: "Update gh agent skill"
+# Keeps src/node/.claude/skills/gh/SKILL.md locked to the same gh release the
+# container ships. The skill is pinned (`--pin`), so `gh skill update` would skip
+# it by design — we regenerate with `gh skill install --pin` instead.
+#
+# Fires after a change to the node Dockerfile lands on main (Renovate bumps
+# GH_VERSION there), regenerates the skill at that exact version, and opens a PR
+# if the content changed. Regeneration is idempotent: when GH_VERSION is
+# unchanged the pinned tree resolves to identical bytes, so no PR is opened.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/node/.devcontainer/Dockerfile"
+  workflow_dispatch:
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    if: "github.ref == 'refs/heads/main'"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Read pinned GH_VERSION from the Dockerfile
+        id: ghver
+        run: |
+          set -euo pipefail
+          version="$(grep -oP 'ARG GH_VERSION=\K[0-9]+\.[0-9]+\.[0-9]+' \
+            src/node/.devcontainer/Dockerfile)"
+          if [ -z "${version}" ]; then
+            echo "Could not find ARG GH_VERSION in the Dockerfile" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Pinned gh version: ${version}"
+
+      - name: Install gh at the pinned version
+        # The tool generating the v$GH_VERSION skill is itself gh v$GH_VERSION,
+        # so `gh skill` (added in 2.90) is guaranteed present and the emitted
+        # skill matches the CLI the container ships. This is a CI helper that
+        # only regenerates a reviewed markdown file, so it skips the container's
+        # cosign provenance dance.
+        env:
+          GH_VERSION: ${{ steps.ghver.outputs.version }}
+        run: |
+          set -euo pipefail
+          tarball="gh_${GH_VERSION}_linux_amd64.tar.gz"
+          wget -nv "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${tarball}"
+          tar -xzf "${tarball}"
+          echo "${PWD}/gh_${GH_VERSION}_linux_amd64/bin" >> "$GITHUB_PATH"
+
+      - name: Regenerate the pinned skill
+        env:
+          GH_VERSION: ${{ steps.ghver.outputs.version }}
+          # Authenticate reads of the public cli/cli repo to avoid rate limits.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh --version
+          gh skill install cli/cli gh \
+            --pin "v${GH_VERSION}" \
+            --dir src/node/.claude/skills \
+            --force
+
+      - name: Open a PR if the skill changed
+        env:
+          GH_VERSION: ${{ steps.ghver.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- src/node/.claude/skills/gh/SKILL.md; then
+            echo "Skill already up to date for gh v${GH_VERSION}; nothing to do."
+            exit 0
+          fi
+
+          git config --global user.email github-actions@github.com
+          git config --global user.name github-actions
+          git config pull.rebase false
+
+          branch="automated-skill-update-${GITHUB_RUN_ID}"
+          message="chore: regenerate gh agent skill for gh v${GH_VERSION}"
+
+          git checkout -b "${branch}"
+          git add src/node/.claude/skills/gh/SKILL.md
+          git commit -m "${message} [skip ci]"
+          git push origin "${branch}"
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/pulls" \
+            -f title="${message}" \
+            -f body="Regenerated \`src/node/.claude/skills/gh/SKILL.md\` from cli/cli@v${GH_VERSION} to match the pinned \`GH_VERSION\` in the node Dockerfile." \
+            -f head="${branch}" \
+            -f base='main'

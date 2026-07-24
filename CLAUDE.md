@@ -41,7 +41,8 @@ tool is on PATH and runs. Add a `check` line when you add a tool to the Dockerfi
 
 ## Release & publish flow (all via GitHub Actions, on push to `main`)
 
-Three independent workflows fire on merge to `main`:
+Four workflows fire on push to `main` — the first three on every merge, the last only when the
+node Dockerfile changes:
 
 1. **release-please** (`release-please.yaml`) — opens/maintains a release PR. Merging it tags a
    release and, via `release-please-config.json`'s `extra-files`, bumps `$.version` in
@@ -50,6 +51,10 @@ Three independent workflows fire on merge to `main`:
    an existing version**, so nothing ships until release-please bumps the version.
 3. **update-documentation** (`update-documentation.yml`) — regenerates `src/*/README.md` and
    opens a PR.
+4. **update-skill** (`update-skill.yaml`) — fires only when `src/node/.devcontainer/Dockerfile`
+   changes (i.e. after a Renovate `GH_VERSION` bump merges). Regenerates
+   `src/node/.claude/skills/gh/SKILL.md` at the pinned gh version and opens a PR. Idempotent — an
+   unchanged `GH_VERSION` produces identical bytes and no PR.
 
 Dependency bumps come from **Renovate** using the shared `andykenward/renovate-config` preset
 (external repo), which drives the version bumps that release-please then releases.
@@ -70,6 +75,21 @@ point is reproducibility and supply-chain provenance, so when editing `src/node/
   remote install script and not Corepack. Renovate's custom manager matches `pnpm@<version>` and
   `GH_VERSION=<version>` — keep those literal patterns intact so bumps keep working.
 - The image runs as non-root `node` by default (`USER node`), matched by `remoteUser: node`.
+- **The `gh` agent skill ships in the payload, not the image.** `src/node/.claude/skills/gh/SKILL.md`
+  is the [`gh` agent skill](https://github.com/cli/cli#agent-skills) from `cli/cli`, so
+  `apply` copies it into every applied project's `.claude/skills/gh/` (project-scoped, committed
+  with the applied repo). It is deliberately **not** baked into the image and **not** installed
+  by a lifecycle command: `~/.claude` is a writable host bind-mount, so image-baked user-scope
+  skills are shadowed at runtime, and a `gh skill install` in `postCreateCommand` would need
+  network + auth and mutate the user's global host config. The committed payload is offline,
+  deterministic, and pinned.
+  **The skill's pin stays in sync with the Dockerfile's `GH_VERSION` automatically** via
+  `update-skill.yaml` (see the workflows section below): Renovate bumps `GH_VERSION` on `main`,
+  that Dockerfile change triggers the workflow, and it regenerates the skill at the new pin and
+  opens a PR. To do it by hand, run
+  `gh skill install cli/cli gh --pin v<VERSION> --dir src/node/.claude/skills --force` (the
+  file's frontmatter `metadata.github-pinned` records the ref). Note `gh skill update` does
+  **not** work here — it skips `--pin`ned skills by design.
 
 The template's `devcontainer.json` bind-mounts host credentials (`~/.claude`, `~/.claude.json`
 read-only, `~/.config/gh` read-only) and its `initializeCommand` `touch`/`mkdir`s them so Docker
