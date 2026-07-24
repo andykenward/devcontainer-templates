@@ -32,9 +32,10 @@ menu — it has **no picker options**.
 
 ## Host prerequisites
 
-The template bind-mounts a few host paths **read-only**, and `initializeCommand`
-pre-creates them so the container can start — a modern Docker daemon refuses to
-start when a bind source is missing, so this is required, not optional. On the
+The template bind-mounts a few host paths (some read-only, some writable), and
+`initializeCommand` pre-creates them so the container can start — a modern Docker
+daemon refuses to start when any bind source is missing, so this is required, not
+optional. On the
 host, authenticate once so the mounts carry real credentials instead of the empty
 `{}` stub `initializeCommand` seeds into `~/.claude.json`:
 
