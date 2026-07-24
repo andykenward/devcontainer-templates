@@ -73,22 +73,40 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git diff --quiet -- src/node/.claude/skills/gh/SKILL.md; then
+          path="src/node/.claude/skills/gh/SKILL.md"
+
+          if git diff --quiet -- "${path}"; then
             echo "Skill already up to date for gh v${GH_VERSION}; nothing to do."
             exit 0
           fi
 
-          git config --global user.email github-actions@github.com
-          git config --global user.name github-actions
-          git config pull.rebase false
-
           branch="automated-skill-update-${GITHUB_RUN_ID}"
           message="chore: regenerate gh agent skill for gh v${GH_VERSION}"
 
-          git checkout -b "${branch}"
-          git add src/node/.claude/skills/gh/SKILL.md
-          git commit -m "${message} [skip ci]"
-          git push origin "${branch}"
+          # Commit via the GitHub API rather than `git push`. API commits made
+          # with GITHUB_TOKEN are signed by GitHub and show as Verified, which a
+          # "require signed commits" ruleset demands — a plain `git push` here
+          # produces an unsigned commit and is rejected with
+          # "Commits must have verified signatures".
+
+          # Branch off the commit this workflow ran against.
+          gh api --method POST \
+            "/repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/heads/${branch}" \
+            -f sha="${GITHUB_SHA}"
+
+          # Blob SHA of the file as it exists on that branch, needed to update it.
+          file_sha="$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${branch}" \
+            --jq '.sha')"
+
+          # Upload the regenerated working-tree file as a single signed commit.
+          gh api --method PUT \
+            "/repos/${GITHUB_REPOSITORY}/contents/${path}" \
+            -f message="${message} [skip ci]" \
+            -f content="$(base64 -w0 "${path}")" \
+            -f branch="${branch}" \
+            -f sha="${file_sha}"
 
           gh api \
             --method POST \
