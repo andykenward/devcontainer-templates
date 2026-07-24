@@ -18,6 +18,7 @@
     "gh",
     "prek",
     "claude-code",
+    "agent-skills",
     "zsh"
   ],
   "optionalPaths": [
