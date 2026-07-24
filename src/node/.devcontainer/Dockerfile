@@ -119,3 +119,18 @@ COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:ef02821aae78d53bf766e2764641b62b5fb7
 # on their own.
 USER node
 WORKDIR /workspace
+
+# Claude Code — installed with Anthropic's official native installer, pinned to a
+# specific version via the installer's `[stable|latest|VERSION]` argument. This
+# is NOT an unpinned `curl | bash`: the version is fixed here for reproducibility
+# and frozen at runtime by DISABLE_AUTOUPDATER=1 (devcontainer.json). The
+# installer refuses to run under sudo and installs into the invoking user's
+# ~/.local, so it runs as `node` (USER above) and its launcher dir is put on
+# PATH. Not the npm package — the native installer has no Node/npm dependency.
+# Renovate bumps CLAUDE_CODE_VERSION; the native channel tracks the
+# @anthropic-ai/claude-code package versions (npm datasource).
+# renovate: datasource=npm depName=@anthropic-ai/claude-code
+ARG CLAUDE_CODE_VERSION=2.1.218
+ENV PATH="/home/node/.local/bin:$PATH"
+RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
+    && claude --version
