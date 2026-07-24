@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/andykenward/devcontainer-templates/compare/v1.2.0...v1.2.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **node:** make credential bind mounts resilient to missing host files ([#33](https://github.com/andykenward/devcontainer-templates/issues/33)) ([adcc457](https://github.com/andykenward/devcontainer-templates/commit/adcc45744c4ff53f639161b0ebf27f502fe385a1))
+
 ## [1.2.0](https://github.com/andykenward/devcontainer-templates/compare/v1.1.0...v1.2.0) (2026-07-24)
 
 
