@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/andykenward/devcontainer-templates/compare/v1.1.0...v1.2.0) (2026-07-24)
+
+
+### Features
+
+* ai skills ([#13](https://github.com/andykenward/devcontainer-templates/issues/13)) ([4b6bec0](https://github.com/andykenward/devcontainer-templates/commit/4b6bec0b872b5f7c1039d2644dfeb12a7da6ef55))
+* change claude code cli install ([#10](https://github.com/andykenward/devcontainer-templates/issues/10)) ([e9d1898](https://github.com/andykenward/devcontainer-templates/commit/e9d1898b86aee9b209ca2e26aeadaeccad5783cc))
+
 ## [1.1.0](https://github.com/andykenward/devcontainer-templates/compare/v1.0.0...v1.1.0) (2026-07-05)
 
 
