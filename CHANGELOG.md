@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/andykenward/devcontainer-templates/compare/v1.2.1...v1.3.0) (2026-07-24)
+
+
+### Features
+
+* **node:** make host credential sharing opt-in ([#37](https://github.com/andykenward/devcontainer-templates/issues/37)) ([4bd7ec5](https://github.com/andykenward/devcontainer-templates/commit/4bd7ec5c3991d134a2cc19d2544a955f6991dfec))
+
 ## [1.2.1](https://github.com/andykenward/devcontainer-templates/compare/v1.2.0...v1.2.1) (2026-07-24)
 
 
