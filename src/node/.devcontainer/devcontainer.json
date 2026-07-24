@@ -46,9 +46,10 @@
   },
 
   // Pre-create the bind-mount sources on the host before the container starts.
-  // The mounts below are read-only, and a modern Docker daemon *refuses* to start
-  // a container whose bind source is missing (older daemons silently auto-created
-  // an empty directory instead). So this command is required, not a convenience.
+  // A modern Docker daemon *refuses* to start a container whose bind source is
+  // missing (older daemons silently auto-created an empty directory instead) —
+  // true for writable and read-only binds alike. So this command is required,
+  // not a convenience.
   // It makes the dirs and seeds .claude.json with valid JSON (`{}`) when it's
   // absent or empty, so a host that hasn't signed into Claude Code yet still
   // starts instead of hard-failing on the mount. See README for host setup
