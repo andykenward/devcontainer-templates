@@ -1,7 +1,7 @@
 
 # Node — pinned toolchain, provenance-verified, with Claude Code (node)
 
-A reproducible Node dev container: digest-pinned node base, pnpm, prek, and a GitHub CLI verified via SLSA build provenance (cosign), plus zsh and the Claude Code feature. Ships an optional renovate.json wired to a shared preset.
+A reproducible Node dev container: digest-pinned node base, pnpm, prek, and a GitHub CLI verified via SLSA build provenance (cosign), plus zsh and the Claude Code CLI. Ships an optional renovate.json wired to a shared preset.
 
 ## Options
 
@@ -25,9 +25,10 @@ menu — it has **no picker options**.
   distroless images (no install script runs).
 - **zsh**: hand-rolled config (history on a named volume, autosuggestions,
   `vcs_info` prompt) — no oh-my-zsh.
-- **Claude Code**: installed via the Anthropic feature, with host credentials
-  bind-mounted (`~/.claude`, `~/.claude.json`) and `gh` credentials shared
-  read-only from `~/.config/gh`.
+- **Claude Code**: installed with Anthropic's official native installer, pinned
+  to a specific version (no npm dependency, no unpinned `curl | bash`), with host
+  credentials bind-mounted (`~/.claude`, `~/.claude.json`) and `gh` credentials
+  shared read-only from `~/.config/gh`.
 - **Optional `renovate.json`**: applying the template offers to drop a root
   `renovate.json` that extends the shared
   [`andykenward/renovate-config`](https://github.com/andykenward/renovate-config)
