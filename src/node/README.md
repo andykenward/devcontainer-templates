@@ -29,6 +29,13 @@ menu — it has **no picker options**.
   to a specific version (no npm dependency, no unpinned `curl | bash`), with host
   credentials bind-mounted (`~/.claude`, `~/.claude.json`) and `gh` credentials
   shared read-only from `~/.config/gh`.
+- **`gh` agent skill**: ships the [`gh` agent skill](https://github.com/cli/cli#agent-skills)
+  from `cli/cli` as a project-scoped skill at `.claude/skills/gh/`, pinned to the
+  same `gh` release as the CLI. It teaches agents (Claude Code and any other
+  agent that reads `.claude/skills`) to drive `gh` well — structured `--json`
+  output, pagination, search vs list, `gh api` fallback. Because it is committed
+  into the applied repo it needs no network or credentials to be present, and the
+  whole team picks it up on `git pull`. Refresh it with `gh skill update gh`.
 - **Optional `renovate.json`**: applying the template offers to drop a root
   `renovate.json` that extends the shared
   [`andykenward/renovate-config`](https://github.com/andykenward/renovate-config)
