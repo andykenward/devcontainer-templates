@@ -177,6 +177,22 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
   unavailable, which is precisely the threat this Dockerfile exists to defend against. Any
   integrity fallback must compare against a digest pinned *in this repo*, not one derived from
   the download.
+- **Three non-obvious facts about GitHub's attestations API**, each of which independently
+  breaks verification silently if you get it wrong:
+  1. `.attestations[].bundle` is **always null** and is gone from the documented schema. The
+     Sigstore bundle lives behind `.bundle_url`, snappy-compressed
+     (`Content-Type: application/x-snappy`) — hence the `python3-snappy` install/purge.
+  2. There are **several attestations per artifact**. `[0]` is the in-toto *release*
+     attestation with no transparency-log entry, so cosign fails with "not enough verified log
+     entries: 0 < 1". Select by `predicateType == "https://slsa.dev/provenance/v1"`; the order
+     is not guaranteed.
+  3. `cosign verify-blob-attestation` defaults to `--type custom` and rejects SLSA with
+     "invalid predicate type". It needs `--type slsaprovenance1`.
+
+  cli/cli's own "Verification of binaries" README section — which this block cites — assumes a
+  hand-downloaded `.sigstore.json` and omits `--type`, so it cannot be copied verbatim.
+  A successful verification prints `Verified OK`; if you don't see that line in the build log,
+  it did not verify.
 - **Declare `ARG TARGETARCH` *inside* the stage, not before the first `FROM`.** A pre-`FROM`
   ARG is global scope and is invisible inside a build stage. If `${TARGETARCH}` expands to
   empty, `arch="${TARGETARCH:-amd64}"` silently falls back to amd64 on *every* platform, and
