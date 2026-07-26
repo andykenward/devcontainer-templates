@@ -154,7 +154,7 @@ RUN set -eux; \
 # right binary. Pinning an arch-specific digest here copies that one arch's
 # binary onto every platform (e.g. an arm64 prek onto an amd64 image), and it
 # fails to execute at runtime — the `prek --version` smoke test catches this.
-COPY --from=ghcr.io/j178/prek:v0.4.3@sha256:ef02821aae78d53bf766e2764641b62b5fb7cf3a2394147395f0bf4105e30484 /prek /usr/local/bin/prek
+COPY --from=ghcr.io/j178/prek:0.4.11@sha256:b8fc85002e8b77d27fa2b8f305bbde52517a314a0d148d6cc816c53324f0d223 /prek /usr/local/bin/prek
 
 # Drop to the non-root `node` user as the image default. devcontainer.json also
 # sets `remoteUser: node` for VS Code, but this also covers plain
