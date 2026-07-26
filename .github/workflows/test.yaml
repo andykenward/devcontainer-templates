@@ -21,10 +21,8 @@ jobs:
     needs: [detect-changes]
     if: ${{ needs.detect-changes.outputs.templates != '[]' && needs.detect-changes.outputs.templates != '' }}
     runs-on: ubuntu-latest
-    # Deliberately NOT continue-on-error. This job reports the health of a
-    # template we publish for other people to use; a green tick over a failed
-    # smoke test is worse than no tick at all. It masked a broken `gh` install
-    # once already.
+    # Deliberately NOT continue-on-error: a green tick over a failed smoke test
+    # is worse than no tick at all.
     strategy:
       matrix:
         templates: ${{ fromJSON(needs.detect-changes.outputs.templates) }}

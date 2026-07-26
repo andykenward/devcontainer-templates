@@ -1,6 +1,3 @@
-# Deliberately a noun phrase, not "Publish ...": this workflow always builds and
-# asserts, but only publishes on main. The jobs (plan / build / merge /
-# publish-templates) carry the verbs, and those are what show per-check.
 name: "(Release) Image + templates"
 
 # Push-to-main is the only workable trigger *for publishing*. release-please
@@ -18,10 +15,8 @@ on:
   push:
     branches:
       - main
-  # The build jobs also run on PRs that can affect the image, without pushing.
-  # Without this the label-append and build steps have no coverage at all until
-  # they are already on main — which is exactly how an unquoted LABEL value
-  # reached main and broke both arches.
+  # PRs that can affect the image build it too, without pushing — otherwise the
+  # label-append and build steps have no coverage until they are on main.
   pull_request:
     paths:
       - ".github/workflows/release.yaml"
@@ -153,22 +148,16 @@ jobs:
         run: |
           set -euo pipefail
           # `devcontainer build --label` is a no-op for Dockerfile-based configs
-          # in CLI 0.88.0 — additionalLabels is only wired up on the
-          # image+features build path — so OCI labels are appended to a
-          # throwaway copy of the context instead. src/node/ stays byte-identical
-          # to what users receive, so a locally built template image never gets
-          # this repo's provenance labels stamped on it.
+          # in CLI 0.88.0 (additionalLabels is only wired up on the image+features
+          # path), so labels are appended to a throwaway copy of the context.
+          # src/node/ stays byte-identical to what users receive.
           #
-          # These LABELs extend the final stage. The CLI appends its own
-          # `FROM $_DEV_CONTAINERS_BASE_IMAGE AS dev_containers_target_stage`
-          # after them, which inherits image-config labels. This is not a
-          # trailing `FROM ... AS` stage of our own, so it does not trip the
-          # circular-dependency pitfall documented in CLAUDE.md.
+          # Appending is safe: the CLI adds its own `FROM ... AS
+          # dev_containers_target_stage` afterwards, which inherits these labels.
           cp -R src/node "${RUNNER_TEMP}/build-ctx"
 
-          # Values are quoted: `LABEL key=two words` parses "two" as the value
-          # and "words" as the next key, and fails with
-          # "Syntax error - can't find = in ...".
+          # Values must be quoted: `LABEL key=two words` reads "words" as the
+          # next key and fails with "Syntax error - can't find = in ...".
           cat >> "${RUNNER_TEMP}/build-ctx/.devcontainer/Dockerfile" <<EOF
 
           LABEL org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"

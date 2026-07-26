@@ -56,41 +56,27 @@ COPY --from=ghcr.io/sigstore/cosign/cosign:v3.1.2@sha256:d91bc4e7e95e8d2f549c747
 # immutable release archive (gh releases are immutable since v2.93.0), fetch its
 # GitHub Artifact Attestation, and have the digest-pinned cosign confirm the
 # bytes were built by cli/cli's own release workflow on public-good Sigstore.
-# Verification fails closed.
+# Verification fails closed — there is deliberately no fallback path.
 #
 # cosign (not `gh attestation verify`) because gh isn't installed yet at this
 # point — this is the tool-agnostic path GitHub documents for the "gh not yet
 # installed" case: https://github.com/cli/cli#verification-of-binaries
 #
-# TARGETARCH is supplied by BuildKit, so this works on amd64 and arm64. It MUST
-# be declared inside the stage: an `ARG TARGETARCH` before the first `FROM` is
-# global scope and is NOT visible here, so `${TARGETARCH}` would silently expand
-# to empty and the fallback below would fetch the amd64 tarball on every
-# platform. That produces an arm64 image carrying an amd64 `gh`, which fails at
-# the `gh --version` check at the end of this block with exit code 126.
+# `ARG TARGETARCH` must be declared inside the stage — one before the first FROM
+# is global scope and expands to empty here, which would fetch the amd64 tarball
+# on every platform. The `:?` below makes that a build failure, not a silent one.
 #
-# This fails closed, and there is deliberately no "verify the download against a
-# hash we just computed from that same download" fallback — that check cannot
-# fail and proves nothing, so it silently installed an unverified gh whenever the
-# attestations API was unavailable.
+# Three easy ways to silently disable this verification:
+#   - reading `.bundle` (always null) rather than `.bundle_url`, which is
+#     snappy-compressed — hence the python3-snappy install/purge below;
+#   - taking attestations[0]: order is not guaranteed, and the in-toto release
+#     attestation carries no transparency-log entry, so select by predicateType;
+#   - omitting `--type slsaprovenance1`; cosign defaults to `custom` and rejects
+#     the SLSA predicate.
+# A successful run prints "Verified OK".
 #
-# The bundle comes from `.attestations[].bundle_url`, NOT `.attestations[].bundle`.
-# GitHub moved the Sigstore bundle out of the API response body: `bundle` is now
-# always null (it is gone from the documented schema), and the real bundle is a
-# snappy-compressed blob behind a signed URL. Reading `.bundle` therefore always
-# yielded null, every build silently took the old "attestation unavailable"
-# fallback, and no provenance was ever actually checked. python3-snappy is
-# installed and purged inside this single RUN, so the layer keeps ~none of it.
-#
-# GitHub returns SEVERAL attestations per artifact. Do not take [0]: that is the
-# in-toto release attestation, which carries no transparency-log entry, so cosign
-# rejects it with "not enough verified log entries from transparency log: 0 < 1".
-# The SLSA build provenance is a different entry, and the order is not
-# guaranteed, so we select it by predicateType.
-#
-# The attestations API is unauthenticated here and rate-limited per source IP per
-# hour, which shared CI runner pools do exhaust (403). The retry loop rides out
-# transient failures; a genuinely exhausted limit needs a re-run once it resets.
+# The API is unauthenticated and rate-limited per IP per hour, which shared CI
+# runner pools exhaust; the retry loop rides out blips, not an exhausted quota.
 #
 # Maintenance:
 #   - GH_VERSION is bumped by Renovate (github-releases custom manager).
@@ -154,7 +140,7 @@ RUN set -eux; \
     tar -xzf "${tarball}"; \
     install -m 0755 "gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh; \
     rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" "/tmp/${tarball}" /tmp/bundle-raw.json \
-      /tmp/gh.sigstore.json /tmp/gh.sigstore.json.sn; \
+      /tmp/gh.sigstore.json /tmp/candidate.json /tmp/candidate.json.sn; \
     gh --version
 
 # prek — pre-commit hook manager, copied from the official digest-pinned

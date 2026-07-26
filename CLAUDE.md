@@ -117,9 +117,7 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   building both arches without pushing (`--push` omitted ⇒ the CLI passes `--load`, so the image
   is inspectable locally). `merge` and every attestation/upload step is gated off. **Only main
   writes the layer cache** — a PR must not be able to poison the cache release builds consume.
-  This exists because the label-append block previously had no coverage until it was already on
-  main, which is how an unquoted `LABEL` value broke both arches. If you add a step here, ask
-  whether it needs a `pull_request` gate.
+  If you add a step here, ask whether it needs a `pull_request` gate.
 - **The assertion step is a real gate, not decoration.** It checks the four labels *and* that
   `devcontainer.metadata` still carries the **unsubstituted** `${localWorkspaceFolderBasename}`
   mount. Both halves are verified to fail when they should. Don't weaken it to a warning.
@@ -168,15 +166,11 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
 ## Common pitfalls when editing the Dockerfile
 
 - **The `gh` attestation check fails closed. Keep it that way.** The API is unauthenticated and
-  rate-limited per source IP per hour, and shared CI runner pools do exhaust it (403), so the
-  fetch is wrapped in a retry loop. If it still cannot be verified, the build **fails** — do not
-  add a "proceed anyway" branch.
-  **Never reintroduce the old SHA256 fallback.** It computed the digest from the downloaded
-  tarball and then verified that same tarball against it — a tautology that could not fail and
-  proved nothing. It silently installed an unverified `gh` whenever attestations were
-  unavailable, which is precisely the threat this Dockerfile exists to defend against. Any
-  integrity fallback must compare against a digest pinned *in this repo*, not one derived from
-  the download.
+  rate-limited per IP per hour, which shared CI runner pools exhaust (403), so the fetch retries.
+  If verification still cannot complete, the build **fails** — do not add a "proceed anyway"
+  branch. In particular, never "verify" the download against a digest computed from that same
+  download: it is a tautology that cannot fail. Any integrity fallback must compare against a
+  digest pinned *in this repo*.
 - **Three non-obvious facts about GitHub's attestations API**, each of which independently
   breaks verification silently if you get it wrong:
   1. `.attestations[].bundle` is **always null** and is gone from the documented schema. The
@@ -193,15 +187,11 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
   hand-downloaded `.sigstore.json` and omits `--type`, so it cannot be copied verbatim.
   A successful verification prints `Verified OK`; if you don't see that line in the build log,
   it did not verify.
-- **Declare `ARG TARGETARCH` *inside* the stage, not before the first `FROM`.** A pre-`FROM`
-  ARG is global scope and is invisible inside a build stage. If `${TARGETARCH}` expands to
-  empty, `arch="${TARGETARCH:-amd64}"` silently falls back to amd64 on *every* platform, and
-  the arm64 image gets an amd64 `gh` — which fails at `gh --version` with exit code 126. This
-  shipped undetected until the first arm64 CI build, because amd64's fallback happened to be
-  correct. The `arch` assignment now uses `${TARGETARCH:?...}` so an empty value fails loudly
-  instead of silently building the wrong thing. **Any new `--build-arg`-style use of a
-  predefined BuildKit arg (`TARGETARCH`, `TARGETPLATFORM`, `BUILDPLATFORM`) needs the same
-  in-stage `ARG` line.**
+- **Declare `ARG TARGETARCH` *inside* the stage, not before the first `FROM`.** A pre-`FROM` ARG
+  is global scope and invisible inside a build stage, so `${TARGETARCH}` expands to empty and the
+  build quietly produces an arm64 image carrying an amd64 `gh` (exit 126 at `gh --version`). The
+  `${TARGETARCH:?...}` guard makes that loud. Any use of a predefined BuildKit arg
+  (`TARGETARCH`, `TARGETPLATFORM`, `BUILDPLATFORM`) needs its own in-stage `ARG` line.
 - **Use POSIX shell syntax, not bash**: The Dockerfile runs under `/bin/sh`. Avoid bash-only
   syntax like process substitution `<(...)`. Use pipes `echo ... | command` instead.
 - **The container has no `sudo`**: The image runs as non-root `node` by design. Tests and
