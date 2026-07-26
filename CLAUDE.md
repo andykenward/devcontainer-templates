@@ -47,8 +47,12 @@ node Dockerfile changes:
 1. **release-please** (`release-please.yaml`) — opens/maintains a release PR. Merging it tags a
    release and, via `release-please-config.json`'s `extra-files`, bumps `$.version` in
    `src/node/devcontainer-template.json`. The version bump is what ships a change.
-2. **release** (`release.yaml`) — publishes `./src` templates to GHCR. It **will not republish
-   an existing version**, so nothing ships until release-please bumps the version.
+2. **release** (`release.yaml`) — builds and publishes the prebuilt image, **then** publishes
+   `./src` templates to GHCR. Four jobs: `plan` (resolve version + decide whether this push is
+   the release-PR merge) → `build` (matrix: amd64 on `ubuntu-latest`, arm64 on
+   `ubuntu-24.04-arm`) → `merge` (manifest list, attestations, cosign signature) →
+   `publish-templates`. The template publish **will not republish an existing version**, so
+   nothing ships until release-please bumps the version. See "The prebuilt image" below.
 3. **update-documentation** (`update-documentation.yml`) — regenerates `src/*/README.md` and
    opens a PR.
 4. **update-skill** (`update-skill.yaml`) — fires only when `src/node/.devcontainer/Dockerfile`
@@ -58,6 +62,42 @@ node Dockerfile changes:
 
 Dependency bumps come from **Renovate** using the shared `andykenward/renovate-config` preset
 (external repo), which drives the version bumps that release-please then releases.
+
+## The prebuilt image — design invariants
+
+`release.yaml` publishes `ghcr.io/andykenward/devcontainer-images/node` (multi-arch, amd64 +
+arm64). Constraints that are load-bearing, each verified against `@devcontainers/cli@0.88.0`:
+
+- **There is exactly one Dockerfile and there must never be a second.** The image is built from
+  `src/node/.devcontainer/` — the same bytes the template ships. Do not add an `images/`
+  directory or copy the Dockerfile.
+- **`devcontainer build` (not `docker buildx build`) is what bakes `devcontainer.metadata`.**
+  That label is the entire reason the `node-image` template can be a two-line file. It is baked
+  even with zero Features — the CLI always appends a `dev_containers_target_stage` carrying it.
+- **The metadata is baked from the *raw*, unsubstituted config**, and the consuming CLI
+  re-substitutes at runtime. So `${localWorkspaceFolderBasename}-zsh-history` stays literal in
+  the label and resolves per-project. If it ever bakes *substituted*, every consumer silently
+  shares one zsh-history volume — the `build` job's assertion step is there to catch regressions
+  in this area.
+- **`name`, `build`, and JSONC comments are NOT baked** (the metadata allowlist excludes them).
+  Consequence: if you add a host-credential mount or change `name` in
+  `src/node/.devcontainer/devcontainer.json`, you must mirror it in `src/node-image/`.
+- **`devcontainer build --label` is a no-op for Dockerfile-based configs.** `additionalLabels`
+  is only wired into the `image:`+Features build path, never the Dockerfile path. OCI labels
+  (`org.opencontainers.image.source`, which is what links the GHCR package to this repo) are
+  therefore appended to a `cp -R` scratch copy of the context in CI, keeping `src/node/`
+  byte-identical for users. If you bump the CLI, re-check whether `--label` started working and
+  simplify. The appended `LABEL` lines are safe — they are not a trailing `FROM ... AS` stage,
+  so they don't trip the circular-dependency pitfall below.
+- **`--push` and `--output` are mutually exclusive and there is no `--metadata-file`.** Docker's
+  canonical push-by-digest multi-arch recipe is unreachable. Each arch pushes a throwaway
+  `:ci-<sha>-<arch>` tag and the digest is read back with `docker buildx imagetools inspect`.
+- **Tag policy**: `edge` + `sha-<12>` on every push to `main`; `X.Y.Z`/`X.Y`/`X`/`latest`
+  additionally when `X.Y.Z` is not yet in the registry. `on: release` and `on: push: tags`
+  **cannot** be used — release-please tags with `GITHUB_TOKEN`, and `GITHUB_TOKEN`-created
+  events do not trigger workflows. The registry probe is the release detector.
+- **`publish-templates` has `needs: [merge]` on purpose.** Do not add `if: always()` — the
+  ordering is what guarantees the image tag exists before a template referencing it ships.
 
 ## The `node` template — design invariants
 

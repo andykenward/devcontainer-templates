@@ -11,6 +11,22 @@
       "matchStrings": ["npm install -g @devcontainers/cli@(?<currentValue>\\S+)"],
       "datasourceTemplate": "npm",
       "depNameTemplate": "@devcontainers/cli"
+    },
+    {
+      "description": "syft pinned in anchore/sbom-action (syft-version: <version>)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["syft-version:\\s*[\"']?(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "anchore/syft"
+    },
+    {
+      "description": "cosign pinned in sigstore/cosign-installer (cosign-release: <version>)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["cosign-release:\\s*[\"']?(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "sigstore/cosign"
     }
   ]
 }
