@@ -1,8 +1,5 @@
 # syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 
-# TARGETARCH is supplied by BuildKit, so this works on amd64 and arm64.
-ARG TARGETARCH
-
 # Base image pinned by digest for reproducibility. Bumping the node version
 # means updating both the tag and the digest — Renovate's Dockerfile manager
 # does both together in one PR.
@@ -65,15 +62,21 @@ COPY --from=ghcr.io/sigstore/cosign/cosign:v3.1.2@sha256:d91bc4e7e95e8d2f549c747
 # point — this is the tool-agnostic path GitHub documents for the "gh not yet
 # installed" case: https://github.com/cli/cli#verification-of-binaries
 #
-# TARGETARCH is supplied by BuildKit, so this works on amd64 and arm64.
+# TARGETARCH is supplied by BuildKit, so this works on amd64 and arm64. It MUST
+# be declared inside the stage: an `ARG TARGETARCH` before the first `FROM` is
+# global scope and is NOT visible here, so `${TARGETARCH}` would silently expand
+# to empty and the fallback below would fetch the amd64 tarball on every
+# platform. That produces an arm64 image carrying an amd64 `gh`, which fails at
+# the `gh --version` check at the end of this block with exit code 126.
 #
 # Maintenance:
 #   - GH_VERSION is bumped by Renovate (github-releases custom manager).
 #   - If cli/cli change their release workflow path/ref, a version bump will
 #     fail verification here — update --certificate-identity to match.
+ARG TARGETARCH
 ARG GH_VERSION=2.96.0
 RUN set -eux; \
-    arch="${TARGETARCH:-amd64}"; \
+    arch="${TARGETARCH:?TARGETARCH is empty — see the note above about ARG scope}"; \
     tarball="gh_${GH_VERSION}_linux_${arch}.tar.gz"; \
     cd /tmp; \
     wget -nv "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${tarball}"; \
