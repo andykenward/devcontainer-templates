@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/andykenward/devcontainer-templates/compare/v2.0.0...v2.1.0) (2026-07-26)
+
+
+### Features
+
+* **node-image:** add a template that uses the prebuilt image ([#43](https://github.com/andykenward/devcontainer-templates/issues/43)) ([1c68145](https://github.com/andykenward/devcontainer-templates/commit/1c6814523a4a9a83dbb1756146849e9542a855e6))
+
 ## [2.0.0](https://github.com/andykenward/devcontainer-templates/compare/v1.3.0...v2.0.0) (2026-07-26)
 
 
