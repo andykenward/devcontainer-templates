@@ -15,7 +15,11 @@ Two templates, same toolchain — one builds it, one pulls it:
 
 A deliberately opinionated, fully pinned baseline — digest-pinned `node` base,
 pnpm, provenance-verified `gh` (cosign + SLSA build provenance), prek, cosign,
-zsh, and the Claude Code feature, with **no picker options**.
+zsh, and a version-pinned Claude Code, with **no picker options**.
+
+It mounts no host paths. Claude Code signs in inside the container and stays
+signed in across rebuilds via a per-project named volume at `~/.claude`; sharing
+your host `gh` login is a single opt-in bind mount.
 
 Apply it directly with the CLI:
 
@@ -62,10 +66,10 @@ cosign verify ghcr.io/andykenward/devcontainer-images/node:2 \
 Dockerfile — you get the whole build in your repo. Use `node-image` if you
 don't: it trades a multi-minute first build for a pull.
 
-The shipped reference is the floating major tag `:1`, deliberately. The
-Dockerfile behind it is fully pinned, so `:1` is reproducible *content*, and
+The shipped reference is the floating major tag `:2`, deliberately. The
+Dockerfile behind it is fully pinned, so `:2` is reproducible *content*, and
 applied projects that take the optional `renovate.json` get their own Renovate
-pinning it to `:1@sha256:…` — which is where a digest pin belongs. Renovate is
+pinning it to `:2@sha256:…` — which is where a digest pin belongs. Renovate is
 disabled for that reference in *this* repo, since pinning it here would churn a
 release on every image rebuild.
 
@@ -74,19 +78,21 @@ release on every image rebuild.
 Version bumps are handled by [Renovate](https://github.com/andykenward/renovate-config)
 using the shared preset in the `andykenward/renovate-config` repo:
 
-- **Native, no config**: base image `FROM` (tag + digest), the `COPY --from`
-  images (prek, cosign), and the `claude-code` Feature.
+- **Native, no config**: base image `FROM` (tag + digest) and the `COPY --from`
+  images (prek, cosign).
+- **Inline `# renovate:` comment in the Dockerfile**: `CLAUDE_CODE_VERSION`,
+  tracked against the `@anthropic-ai/claude-code` npm package. Claude Code is
+  installed by Anthropic's native installer, not a dev container Feature.
 - **Custom managers (in the preset)**: `pnpm@<version>` and `GH_VERSION=<version>`
   inside the Dockerfile.
-
 - **Custom managers (in this repo's `renovate.json`)**: the devcontainer CLI,
   syft, and cosign pins inside the workflows.
 
 When Renovate's conventional-commit PRs land, **release-please** bumps this
-collection's own `version` in `src/node/devcontainer-template.json` and cuts a
-release; the publish workflow then republishes to GHCR (it won't republish an
-existing version, so the bump is what ships changes) and pushes the matching
-semver image tags.
+collection's own `version` — one root version, written into *both* templates'
+`devcontainer-template.json` via `extra-files` — and cuts a release; the publish
+workflow then republishes to GHCR (it won't republish an existing version, so the
+bump is what ships changes) and pushes the matching semver image tags.
 
 ## One-time setup runbook
 
@@ -145,6 +151,7 @@ semver image tags.
 │       └── zshrc
 ├── src/node-image/      # same payload, but .devcontainer/devcontainer.json is
 │   └── ...              # just an `image:` reference to the prebuilt image
+│                        # (README.md here is auto-generated too)
 ├── test/node/test.sh
 ├── test/node-image/test.sh
 ├── release-please-config.json
