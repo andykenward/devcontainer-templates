@@ -38,11 +38,11 @@ jobs:
           branch="automated-documentation-update-${GITHUB_RUN_ID}"
           message="Automated documentation update"
 
-          # Commit via the Git Data API rather than `git push`. API commits made
-          # with GITHUB_TOKEN are signed by GitHub and show as Verified, which a
-          # "require signed commits" ruleset demands — a plain `git push` here
-          # produces an unsigned commit and is rejected with
-          # "Commits must have verified signatures".
+          # Commit via the Git database API (/repos/../git/{blobs,trees,commits})
+          # rather than `git push`. API commits made with GITHUB_TOKEN are signed
+          # by GitHub and show as Verified, which a "require signed commits"
+          # ruleset demands — a plain `git push` here produces an unsigned commit
+          # and is rejected with "Commits must have verified signatures".
 
           base_sha="${GITHUB_SHA}"
           base_tree="$(gh api \
