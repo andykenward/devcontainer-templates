@@ -15,12 +15,23 @@ on:
   push:
     branches:
       - main
+  # The build jobs also run on PRs that can affect the image, without pushing.
+  # Without this the label-append and build steps have no coverage at all until
+  # they are already on main — which is exactly how an unquoted LABEL value
+  # reached main and broke both arches.
+  pull_request:
+    paths:
+      - ".github/workflows/release.yaml"
+      - "src/node/.devcontainer/**"
 
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false # never cancel a half-finished publish
+  # Keyed by ref so a PR run never queues behind or against a publish. Pushes to
+  # main all share one group, so publishes stay serialised.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a half-finished publish; superseded PR runs are fine to drop.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE: ghcr.io/andykenward/devcontainer-images/node
@@ -34,7 +45,7 @@ env:
 jobs:
   # ── 1. Decide the version, and whether this push is a release ──────────────
   plan:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,6 +70,7 @@ jobs:
         id: plan
         env:
           FORCE: ${{ inputs.force-semver-tags }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
         run: |
           set -euo pipefail
 
@@ -74,7 +86,9 @@ jobs:
           # which is idempotent and safe to re-run. On the very first run
           # nothing is published yet, so the full semver set ships immediately
           # and :1 exists from day one.
-          if [ "${FORCE:-false}" = "true" ]; then
+          if [ "${IS_PR}" = "true" ]; then
+            semver=false      # nothing is published from a pull request
+          elif [ "${FORCE:-false}" = "true" ]; then
             semver=true
           elif docker buildx imagetools inspect "${IMAGE}:${version}" >/dev/null 2>&1; then
             semver=false
@@ -103,6 +117,10 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
+    env:
+      # On a pull request the image is built and inspected but never pushed,
+      # never cached to, and never attested.
+      PUSH: ${{ github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -176,13 +194,31 @@ jobs:
           # --push rather than the canonical push-by-digest flow: CLI 0.88.0
           # rejects --push together with --output, and has no --metadata-file
           # passthrough, so the digest is read back from the registry below.
-          devcontainer build \
-            --workspace-folder "${RUNNER_TEMP}/build-ctx" \
-            --image-name "${arch_tag}" \
-            --platform "linux/${ARCH}" \
-            --cache-from "type=registry,ref=${CACHE_IMAGE}:${ARCH}" \
-            --cache-to "type=registry,ref=${CACHE_IMAGE}:${ARCH},mode=max,image-manifest=true,oci-mediatypes=true" \
-            --push
+          build_args=(
+            --workspace-folder "${RUNNER_TEMP}/build-ctx"
+            --image-name "${arch_tag}"
+            --platform "linux/${ARCH}"
+            --cache-from "type=registry,ref=${CACHE_IMAGE}:${ARCH}"
+          )
+
+          if [ "${PUSH}" = "true" ]; then
+            # Only main writes the cache. A pull request must not be able to
+            # poison the layer cache that release builds consume.
+            build_args+=(
+              --cache-to "type=registry,ref=${CACHE_IMAGE}:${ARCH},mode=max,image-manifest=true,oci-mediatypes=true"
+              --push
+            )
+          fi
+
+          devcontainer build "${build_args[@]}"
+
+          if [ "${PUSH}" != "true" ]; then
+            # With neither --push nor --output the CLI passes --load, so the
+            # image is in the local docker for the assertion step to inspect.
+            echo "pull request: built linux/${ARCH}, not pushed"
+            echo "built \`linux/${ARCH}\` (not pushed)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           digest="$(docker buildx imagetools inspect "${arch_tag}" \
             --format '{{json .Manifest}}' | jq -r '.digest')"
@@ -199,18 +235,41 @@ jobs:
       - name: Assert devcontainer.metadata and OCI labels were baked
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          image_json="$(docker buildx imagetools inspect "${IMAGE}@${DIGEST}" --format '{{json .Image}}')"
-          for label in devcontainer.metadata org.opencontainers.image.source; do
+          if [ -n "${DIGEST}" ]; then
+            subject="${IMAGE}@${DIGEST}"
+            image_json="$(docker buildx imagetools inspect "${subject}" --format '{{json .Image}}')"
+          else
+            # Pull request: the build was --load'ed rather than pushed.
+            subject="${IMAGE}:ci-${GITHUB_SHA}-${ARCH}"
+            image_json="$(docker inspect "${subject}" --format '{{json .Config}}')"
+          fi
+
+          for label in devcontainer.metadata org.opencontainers.image.source \
+                       org.opencontainers.image.title org.opencontainers.image.description; do
             if ! printf '%s' "${image_json}" | jq -e --arg l "${label}" \
               'any(..|objects; has($l))' >/dev/null; then
-              echo "expected label '${label}' is missing from ${IMAGE}@${DIGEST}" >&2
+              echo "expected label '${label}' is missing from ${subject}" >&2
               exit 1
             fi
           done
 
+          # The metadata must carry the *raw* config: if the CLI ever baked the
+          # substituted value, every consumer of the image would silently share
+          # one zsh-history volume named after this build's folder.
+          if ! printf '%s' "${image_json}" | jq -e \
+            '[..|objects|.["devcontainer.metadata"]?|select(.)][0] | fromjson
+             | any(.[]; (.mounts // [])[] | contains("${localWorkspaceFolderBasename}-zsh-history"))' >/dev/null; then
+            echo "devcontainer.metadata does not carry the unsubstituted zsh-history mount" >&2
+            printf '%s' "${image_json}" | jq '[..|objects|.["devcontainer.metadata"]?|select(.)][0]' >&2
+            exit 1
+          fi
+          echo "ok - metadata, OCI labels, and unsubstituted mount all present on ${subject}"
+
       - name: Stage per-arch metadata
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           ARCH: ${{ matrix.arch }}
@@ -220,6 +279,7 @@ jobs:
           printf '%s' "${DIGEST}" > "${RUNNER_TEMP}/meta/digest-${ARCH}.txt"
 
       - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
@@ -228,6 +288,7 @@ jobs:
       # syft resolves IMAGE@<manifest-digest> to exactly that platform, so this
       # SBOM is genuinely per-architecture.
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
           format: spdx-json
@@ -237,6 +298,7 @@ jobs:
           syft-version: "v1.49.0"
 
       - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
@@ -244,6 +306,7 @@ jobs:
           push-to-registry: true
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           name: image-meta-${{ matrix.arch }}
           path: ${{ runner.temp }}/meta/*
@@ -253,6 +316,7 @@ jobs:
   # ── 3. Manifest list, index-level attestations, signature ─────────────────
   merge:
     needs: [plan, build]
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

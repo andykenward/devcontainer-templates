@@ -98,6 +98,16 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   events do not trigger workflows. The registry probe is the release detector.
 - **`publish-templates` has `needs: [merge]` on purpose.** Do not add `if: always()` — the
   ordering is what guarantees the image tag exists before a template referencing it ships.
+- **`plan` and `build` also run on PRs** that touch `release.yaml` or `src/node/.devcontainer/**`,
+  building both arches without pushing (`--push` omitted ⇒ the CLI passes `--load`, so the image
+  is inspectable locally). `merge` and every attestation/upload step is gated off. **Only main
+  writes the layer cache** — a PR must not be able to poison the cache release builds consume.
+  This exists because the label-append block previously had no coverage until it was already on
+  main, which is how an unquoted `LABEL` value broke both arches. If you add a step here, ask
+  whether it needs a `pull_request` gate.
+- **The assertion step is a real gate, not decoration.** It checks the four labels *and* that
+  `devcontainer.metadata` still carries the **unsubstituted** `${localWorkspaceFolderBasename}`
+  mount. Both halves are verified to fail when they should. Don't weaken it to a warning.
 
 ## The `node` template — design invariants
 
@@ -146,6 +156,15 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
   attestations from the GitHub API. Not all releases have available attestations. Always include
   error handling (jq returns `null` if missing) with a fallback to SHA256 verification instead
   of failing closed. See the `gh` installation RUN block.
+- **Declare `ARG TARGETARCH` *inside* the stage, not before the first `FROM`.** A pre-`FROM`
+  ARG is global scope and is invisible inside a build stage. If `${TARGETARCH}` expands to
+  empty, `arch="${TARGETARCH:-amd64}"` silently falls back to amd64 on *every* platform, and
+  the arm64 image gets an amd64 `gh` — which fails at `gh --version` with exit code 126. This
+  shipped undetected until the first arm64 CI build, because amd64's fallback happened to be
+  correct. The `arch` assignment now uses `${TARGETARCH:?...}` so an empty value fails loudly
+  instead of silently building the wrong thing. **Any new `--build-arg`-style use of a
+  predefined BuildKit arg (`TARGETARCH`, `TARGETPLATFORM`, `BUILDPLATFORM`) needs the same
+  in-stage `ARG` line.**
 - **Use POSIX shell syntax, not bash**: The Dockerfile runs under `/bin/sh`. Avoid bash-only
   syntax like process substitution `<(...)`. Use pipes `echo ... | command` instead.
 - **The container has no `sudo`**: The image runs as non-root `node` by design. Tests and
