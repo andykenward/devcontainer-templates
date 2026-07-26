@@ -144,15 +144,22 @@ jobs:
           # trailing `FROM ... AS` stage of our own, so it does not trip the
           # circular-dependency pitfall documented in CLAUDE.md.
           cp -R src/node "${RUNNER_TEMP}/build-ctx"
-          {
-            echo ""
-            echo "LABEL org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
-            echo "LABEL org.opencontainers.image.revision=${GITHUB_SHA}"
-            echo "LABEL org.opencontainers.image.version=${VERSION}"
-            echo "LABEL org.opencontainers.image.licenses=MIT"
-            echo "LABEL org.opencontainers.image.title=devcontainer-images/node"
-            echo "LABEL org.opencontainers.image.description=Prebuilt dev container image for the andykenward/devcontainer-templates node template"
-          } >> "${RUNNER_TEMP}/build-ctx/.devcontainer/Dockerfile"
+
+          # Values are quoted: `LABEL key=two words` parses "two" as the value
+          # and "words" as the next key, and fails with
+          # "Syntax error - can't find = in ...".
+          cat >> "${RUNNER_TEMP}/build-ctx/.devcontainer/Dockerfile" <<EOF
+
+          LABEL org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"
+          LABEL org.opencontainers.image.revision="${GITHUB_SHA}"
+          LABEL org.opencontainers.image.version="${VERSION}"
+          LABEL org.opencontainers.image.licenses="MIT"
+          LABEL org.opencontainers.image.title="devcontainer-images/node"
+          LABEL org.opencontainers.image.description="Prebuilt dev container image for the andykenward/devcontainer-templates node template"
+          EOF
+
+          echo "--- appended ---"
+          tail -8 "${RUNNER_TEMP}/build-ctx/.devcontainer/Dockerfile"
 
       - name: Build and push linux/${{ matrix.arch }}
         id: build
