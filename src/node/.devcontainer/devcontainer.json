@@ -45,31 +45,35 @@
     "DISABLE_AUTOUPDATER": "1"
   },
 
-  // ── Host credential sharing (optional, OFF by default) ──────────────────
-  // By default this template mounts no host paths, so it starts cleanly on any
-  // host and in any Dev Containers flow.
-  //
-  // To reuse your host Claude Code + gh credentials inside the container,
-  // authenticate once on the host (`gh auth login`, and sign in to Claude Code)
-  // so the source paths exist, then uncomment the three bind mounts below.
-  //
-  // Heads up if you commit them: everyone who opens this repo in a container
-  // then depends on the same host paths. A teammate who hasn't authenticated on
-  // their host will get `bind source path does not exist` on start — they fix it
-  // by authenticating on the host and rebuilding, or by re-commenting the mounts.
+  // Named volumes, not host paths: the container starts cleanly on any host and
+  // in any Dev Containers flow, and nothing here depends on your host layout.
   "mounts": [
-    // ── Optional host-credential mounts (see note above) ──
-    // Claude Code credentials — read-only so container processes can't tamper
-    // with host auth.
-    // "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,readonly",
-    // Claude Code working state (projects, todos, memory) — must be writable.
-    // "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
-    // GitHub CLI credentials — read-only; re-auth on the host with `gh auth login`.
+    // ── Optional host-credential mount (OFF by default) ──
+    // Reuse the GitHub CLI login from your host: run `gh auth login` on the host
+    // first — a bind mount requires its source to already exist — then uncomment
+    // the line below. Read-only, so container processes can't tamper with host
+    // auth. Claude Code needs no equivalent: it signs in inside the container and
+    // the volume below keeps it signed in.
+    //
+    // Heads up if you commit it: everyone who opens this repo in a container then
+    // depends on the same host path. A teammate who hasn't run `gh auth login`
+    // will get `bind source path does not exist` on start.
     // "source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,readonly",
 
-    // Per-project named volume for persistent zsh history across rebuilds.
-    // Derived from the folder name so each project gets its own history.
-    "source=${localWorkspaceFolderBasename}-zsh-history,target=/commandhistory,type=volume"
+    // Claude Code state — the auth token, settings, session transcripts, auto
+    // memory and prompt history all live under CLAUDE_CONFIG_DIR (set above), so
+    // this volume is what stops a rebuild signing you out and losing your
+    // sessions. ${devcontainerId} is unique to this workspace, so two projects
+    // never share one volume. Reset it with `docker volume rm` — nothing inside
+    // the container clears it. https://code.claude.com/docs/en/devcontainer
+    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
+
+    // Persistent zsh history across rebuilds. Keyed by ${devcontainerId} for the
+    // same reason as the volume above: the folder name is not unique, and shell
+    // history routinely contains tokens pasted into `curl` or `gh` commands, so
+    // two unrelated projects that happen to share a folder name must not share
+    // one history file.
+    "source=zsh-history-${devcontainerId},target=/home/node/.commandhistory,type=volume"
   ],
 
   // Connect as the non-root `node` user (the Dockerfile's default USER). Set to

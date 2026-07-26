@@ -248,17 +248,22 @@ jobs:
             fi
           done
 
-          # The metadata must carry the *raw* config: if the CLI ever baked the
-          # substituted value, every consumer of the image would silently share
-          # one zsh-history volume named after this build's folder.
-          if ! printf '%s' "${image_json}" | jq -e \
-            '[..|objects|.["devcontainer.metadata"]?|select(.)][0] | fromjson
-             | any(.[]; (.mounts // [])[] | contains("${localWorkspaceFolderBasename}-zsh-history"))' >/dev/null; then
-            echo "devcontainer.metadata does not carry the unsubstituted zsh-history mount" >&2
-            printf '%s' "${image_json}" | jq '[..|objects|.["devcontainer.metadata"]?|select(.)][0]' >&2
-            exit 1
-          fi
-          echo "ok - metadata, OCI labels, and unsubstituted mount all present on ${subject}"
+          # The metadata must carry the *raw* config. If the CLI ever baked the
+          # substituted values, every consumer of the image would silently share
+          # one zsh-history volume and one Claude Code state volume — the latter
+          # holding an OAuth token and every session transcript — all named after
+          # this build's folder. Single-quoted so the shell leaves ${...} alone.
+          for mount in 'zsh-history-${devcontainerId}' \
+                       'claude-code-config-${devcontainerId}'; do
+            if ! printf '%s' "${image_json}" | jq -e --arg m "${mount}" \
+              '[..|objects|.["devcontainer.metadata"]?|select(.)][0] | fromjson
+               | any(.[]; (.mounts // [])[] | contains($m))' >/dev/null; then
+              echo "devcontainer.metadata does not carry the unsubstituted mount: ${mount}" >&2
+              printf '%s' "${image_json}" | jq '[..|objects|.["devcontainer.metadata"]?|select(.)][0]' >&2
+              exit 1
+            fi
+          done
+          echo "ok - metadata, OCI labels, and unsubstituted mounts all present on ${subject}"
 
       - name: Stage per-arch metadata
         if: ${{ github.event_name != 'pull_request' }}

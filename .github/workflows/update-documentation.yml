@@ -29,7 +29,18 @@ jobs:
           set -euo pipefail
 
           # Collect the regenerated README files from the working tree.
-          mapfile -t files < <(git diff --name-only | grep -E '(^|/)README\.md$' || true)
+          #
+          # Both halves are needed. `git diff` lists modified *tracked* files and
+          # is blind to untracked ones, so a brand-new template's README — which
+          # has never been committed — is silently dropped and the step reports
+          # "nothing to do". That is exactly what happened to src/node-image:
+          # every run after it merged generated the file and then discarded it.
+          mapfile -t files < <(
+            {
+              git diff --name-only
+              git ls-files --others --exclude-standard
+            } | grep -E '^src/[^/]+/README\.md$' | sort -u || true
+          )
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No documentation changes; nothing to do."
             exit 0

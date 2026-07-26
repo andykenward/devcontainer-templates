@@ -67,8 +67,9 @@ jobs:
             --force
 
           # Both templates ship the skill in their payload (it is deliberately
-          # not baked into the image — ~/.claude is often a writable bind mount
-          # that would shadow a user-scope skill). Mirror the freshly generated
+          # not baked into the image — ~/.claude is a writable named volume that
+          # would shadow a user-scope skill, and serve a stale copy forever since
+          # a volume seeds from the image only once). Mirror the freshly generated
           # copy so the two can never drift to different pinned gh versions.
           rm -rf src/node-image/.claude/skills/gh
           mkdir -p src/node-image/.claude/skills
