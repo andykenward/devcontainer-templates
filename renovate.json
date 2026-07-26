@@ -3,6 +3,14 @@
   "extends": [
     "github>andykenward/renovate-config"
   ],
+  "packageRules": [
+    {
+      "description": "The node-image template deliberately ships a floating major tag. The shared preset pulls in docker:pinDigests, which would otherwise digest-pin this payload and open a bump PR on every image rebuild — each one driving a release and a republish of both templates. Digest pinning is the *consumer's* Renovate's job: they get renovate.json via optionalPaths. It would also break the PR smoke test, which local-tags this exact reference.",
+      "matchManagers": ["devcontainer"],
+      "matchFileNames": ["src/node-image/.devcontainer/devcontainer.json"],
+      "enabled": false
+    }
+  ],
   "customManagers": [
     {
       "description": "devcontainer CLI pinned in the test workflow (npm install -g @devcontainers/cli@<version>)",

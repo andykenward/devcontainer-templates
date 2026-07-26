@@ -66,6 +66,14 @@ jobs:
             --dir src/node/.claude/skills \
             --force
 
+          # Both templates ship the skill in their payload (it is deliberately
+          # not baked into the image — ~/.claude is often a writable bind mount
+          # that would shadow a user-scope skill). Mirror the freshly generated
+          # copy so the two can never drift to different pinned gh versions.
+          rm -rf src/node-image/.claude/skills/gh
+          mkdir -p src/node-image/.claude/skills
+          cp -R src/node/.claude/skills/gh src/node-image/.claude/skills/
+
       - name: Open a PR if the skill changed
         env:
           GH_VERSION: ${{ steps.ghver.outputs.version }}
@@ -73,46 +81,63 @@ jobs:
         run: |
           set -euo pipefail
 
-          path="src/node/.claude/skills/gh/SKILL.md"
-
-          if git diff --quiet -- "${path}"; then
+          # One skill copy per template, so this commits N files rather than one.
+          mapfile -t files < <(git diff --name-only -- 'src/*/.claude/skills/gh/SKILL.md')
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "Skill already up to date for gh v${GH_VERSION}; nothing to do."
             exit 0
           fi
+          printf 'changed: %s\n' "${files[@]}"
 
           branch="automated-skill-update-${GITHUB_RUN_ID}"
           message="chore: regenerate gh agent skill for gh v${GH_VERSION}"
 
-          # Commit via the GitHub API rather than `git push`. API commits made
+          # Commit via the Git Data API rather than `git push`. API commits made
           # with GITHUB_TOKEN are signed by GitHub and show as Verified, which a
           # "require signed commits" ruleset demands — a plain `git push` here
           # produces an unsigned commit and is rejected with
           # "Commits must have verified signatures".
 
-          # Branch off the commit this workflow ran against.
+          base_sha="${GITHUB_SHA}"
+          base_tree="$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/git/commits/${base_sha}" --jq '.tree.sha')"
+
+          # Upload each changed file as a blob and assemble the tree entries.
+          tree_entries='[]'
+          for f in "${files[@]}"; do
+            blob_sha="$(gh api --method POST \
+              "/repos/${GITHUB_REPOSITORY}/git/blobs" \
+              -f content="$(base64 -w0 "${f}")" \
+              -f encoding=base64 \
+              --jq '.sha')"
+            tree_entries="$(jq -c --arg path "${f}" --arg sha "${blob_sha}" \
+              '. += [{path: $path, mode: "100644", type: "blob", sha: $sha}]' \
+              <<<"${tree_entries}")"
+          done
+
+          new_tree="$(jq -n --arg base "${base_tree}" --argjson tree "${tree_entries}" \
+            '{base_tree: $base, tree: $tree}' \
+            | gh api --method POST "/repos/${GITHUB_REPOSITORY}/git/trees" \
+                --input - --jq '.sha')"
+
+          new_commit="$(jq -n \
+            --arg msg "${message} [skip ci]" \
+            --arg tree "${new_tree}" \
+            --arg parent "${base_sha}" \
+            '{message: $msg, tree: $tree, parents: [$parent]}' \
+            | gh api --method POST "/repos/${GITHUB_REPOSITORY}/git/commits" \
+                --input - --jq '.sha')"
+
           gh api --method POST \
             "/repos/${GITHUB_REPOSITORY}/git/refs" \
             -f ref="refs/heads/${branch}" \
-            -f sha="${GITHUB_SHA}"
-
-          # Blob SHA of the file as it exists on that branch, needed to update it.
-          file_sha="$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${branch}" \
-            --jq '.sha')"
-
-          # Upload the regenerated working-tree file as a single signed commit.
-          gh api --method PUT \
-            "/repos/${GITHUB_REPOSITORY}/contents/${path}" \
-            -f message="${message} [skip ci]" \
-            -f content="$(base64 -w0 "${path}")" \
-            -f branch="${branch}" \
-            -f sha="${file_sha}"
+            -f sha="${new_commit}"
 
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/pulls" \
             -f title="${message}" \
-            -f body="Regenerated \`src/node/.claude/skills/gh/SKILL.md\` from cli/cli@v${GH_VERSION} to match the pinned \`GH_VERSION\` in the node Dockerfile." \
+            -f body="Regenerated the pinned \`gh\` agent skill from cli/cli@v${GH_VERSION} to match the pinned \`GH_VERSION\` in the node Dockerfile, in every template that ships it." \
             -f head="${branch}" \
             -f base='main'

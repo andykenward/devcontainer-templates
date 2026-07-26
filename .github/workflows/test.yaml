@@ -15,7 +15,15 @@ jobs:
         id: filter
         with:
           filters: |
-            node: ./**/node/**
+            node:
+              - 'src/node/**'
+              - 'test/node/**'
+            node-image:
+              - 'src/node-image/**'
+              - 'test/node-image/**'
+              # node-image consumes an image built from the node template's
+              # build context, so a Dockerfile change must retest it too.
+              - 'src/node/.devcontainer/**'
 
   test:
     needs: [detect-changes]
@@ -26,6 +34,10 @@ jobs:
     strategy:
       matrix:
         templates: ${{ fromJSON(needs.detect-changes.outputs.templates) }}
+    env:
+      # Indirected out of the `run:` blocks below rather than interpolated
+      # directly, so a matrix value can never be spliced into the shell.
+      TEMPLATE_ID: ${{ matrix.templates }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -33,12 +45,12 @@ jobs:
         run: npm install -g @devcontainers/cli@0.88.0
 
       - name: "Generating tests for '${{ matrix.templates }}'"
-        run: echo "${{ matrix.templates }}"
+        run: echo "${TEMPLATE_ID}"
 
       - name: Configure template
         run: |
           set -e
-          cd src/${{ matrix.templates }}
+          cd "src/${TEMPLATE_ID}"
 
           # Configure templates only if `devcontainer-template.json` contains the `options` property.
           optionProp=( $(jq -r '.options' devcontainer-template.json) )
@@ -47,14 +59,14 @@ jobs:
             options=( $(jq -r '.options | keys[]' devcontainer-template.json) )
 
             if [ "${options[0]}" != "" ] && [ "${options[0]}" != "null" ] ; then
-              echo "(!) Configuring template options within 'src/${{ matrix.templates }}' folder"
+              echo "(!) Configuring template options within 'src/${TEMPLATE_ID}' folder"
               for option in "${options[@]}"
               do
                 option_key="\${templateOption:$option}"
                 option_value=$(jq -r ".options | .${option} | .default" devcontainer-template.json)
 
                 if [ "${option_value}" = "" ] || [ "${option_value}" = "null" ] ; then
-                  echo "Template '${{ matrix.templates }}' is missing a default value for option '${option}'"
+                  echo "Template '${TEMPLATE_ID}' is missing a default value for option '${option}'"
                   exit 1
                 fi
 
@@ -65,13 +77,43 @@ jobs:
             fi
           fi
 
+      # Templates that reference a prebuilt ghcr.io/andykenward/devcontainer-images
+      # image are tested against an image built from THIS pull request, not the
+      # published one — which may not exist yet, and is stale the moment a PR
+      # touches the Dockerfile. The devcontainer CLI runs `docker inspect` before
+      # `docker pull`, so tagging the local build with the exact reference the
+      # template asks for makes `devcontainer up` resolve it locally and never
+      # reach the registry.
+      #
+      # This also makes the smoke test cover the metadata baking end-to-end,
+      # through the same `devcontainer build` code path release.yaml publishes
+      # with. It is what catches "the metadata label no longer carries
+      # remoteUser" before it ships.
+      - name: Build and locally tag the prebuilt image
+        run: |
+          set -euo pipefail
+          config="src/${TEMPLATE_ID}/.devcontainer/devcontainer.json"
+
+          # grep, not the `sed 's|//.*||'` JSONC strip used below — that also
+          # mangles https:// inside string values.
+          ref="$(grep -oE '"image"[[:space:]]*:[[:space:]]*"ghcr\.io/andykenward/devcontainer-images/[^"]+"' "${config}" \
+                 | head -1 | sed -E 's/.*"([^"]+)"$/\1/' || true)"
+
+          if [ -z "${ref}" ]; then
+            echo "Template '${TEMPLATE_ID}' does not reference a prebuilt image; nothing to do."
+            exit 0
+          fi
+
+          echo "Template image reference: ${ref}"
+          devcontainer build --workspace-folder src/node --image-name "${ref}"
+
       - name: Run Smoke Test
         run: |
-          template_id="${{ matrix.templates }}"
+          template_id="${TEMPLATE_ID}"
           src_dir="test/${template_id}"
 
           if [ ! -d "$(pwd)/${src_dir}" ] ; then
-            echo "Template '${{ matrix.templates }}' is missing a test folder"
+            echo "Template '${TEMPLATE_ID}' is missing a test folder"
             exit 1
           fi
 

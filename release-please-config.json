@@ -10,6 +10,11 @@
           "type": "json",
           "path": "src/node/devcontainer-template.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "src/node-image/devcontainer-template.json",
+          "jsonpath": "$.version"
         }
       ]
     }
