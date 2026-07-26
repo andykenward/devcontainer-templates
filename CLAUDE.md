@@ -91,10 +91,13 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   That label is the entire reason the `node-image` template can be a two-line file. It is baked
   even with zero Features — the CLI always appends a `dev_containers_target_stage` carrying it.
 - **The metadata is baked from the *raw*, unsubstituted config**, and the consuming CLI
-  re-substitutes at runtime. So `${localWorkspaceFolderBasename}-zsh-history` stays literal in
-  the label and resolves per-project. If it ever bakes *substituted*, every consumer silently
-  shares one zsh-history volume — the `build` job's assertion step is there to catch regressions
-  in this area.
+  re-substitutes at runtime. So `${localWorkspaceFolderBasename}-zsh-history` and
+  `claude-code-config-${devcontainerId}` stay literal in the label and resolve per-project.
+  (Verified in CLI 0.88.0: `bn()` *composes* the substitution closure, and the image-label
+  metadata is substituted through that same closure — so `${devcontainerId}` round-trips just
+  like the other variables.) If either ever bakes *substituted*, every consumer silently shares
+  one zsh-history volume and one Claude Code state volume — the latter holding an OAuth token
+  and every session transcript. The `build` job's assertion step catches regressions here.
 - **`name`, `build`, and JSONC comments are NOT baked** (the metadata allowlist excludes them).
   Consequence: if you add a host-credential mount or change `name` in
   `src/node/.devcontainer/devcontainer.json`, you must mirror it in `src/node-image/`.
@@ -120,8 +123,10 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   writes the layer cache** — a PR must not be able to poison the cache release builds consume.
   If you add a step here, ask whether it needs a `pull_request` gate.
 - **The assertion step is a real gate, not decoration.** It checks the four labels *and* that
-  `devcontainer.metadata` still carries the **unsubstituted** `${localWorkspaceFolderBasename}`
-  mount. Both halves are verified to fail when they should. Don't weaken it to a warning.
+  `devcontainer.metadata` still carries **both** unsubstituted volume mounts
+  (`${localWorkspaceFolderBasename}-zsh-history`, `claude-code-config-${devcontainerId}`). Both
+  halves are verified to fail when they should. Don't weaken it to a warning. If you add a named
+  volume to `src/node/.devcontainer/devcontainer.json`, add it to that loop.
 
 ## The `node` template — design invariants
 
@@ -143,10 +148,11 @@ point is reproducibility and supply-chain provenance, so when editing `src/node/
   is the [`gh` agent skill](https://github.com/cli/cli#agent-skills) from `cli/cli`, so
   `apply` copies it into every applied project's `.claude/skills/gh/` (project-scoped, committed
   with the applied repo). It is deliberately **not** baked into the image and **not** installed
-  by a lifecycle command: `~/.claude` is a writable host bind-mount, so image-baked user-scope
-  skills are shadowed at runtime, and a `gh skill install` in `postCreateCommand` would need
-  network + auth and mutate the user's global host config. The committed payload is offline,
-  deterministic, and pinned.
+  by a lifecycle command: `~/.claude` is a writable named volume (and optionally a host bind
+  mount), so image-baked user-scope skills are shadowed at runtime — worse with a volume, which
+  seeds from the image *once* and then serves that copy forever. A `gh skill install` in
+  `postCreateCommand` would need network + auth and mutate global config. The committed payload
+  is offline, deterministic, and pinned.
   **The skill's pin stays in sync with the Dockerfile's `GH_VERSION` automatically** via
   `update-skill.yaml` (see the workflows section below): Renovate bumps `GH_VERSION` on `main`,
   that Dockerfile change triggers the workflow, and it regenerates the skill at the new pin and
@@ -155,14 +161,35 @@ point is reproducibility and supply-chain provenance, so when editing `src/node/
   file's frontmatter `metadata.github-pinned` records the ref). Note `gh skill update` does
   **not** work here — it skips `--pin`ned skills by design.
 
-The template's `devcontainer.json` mounts **no host paths by default** (only a per-project named
-volume for zsh history), so it starts cleanly on any host and in any Dev Containers flow. Sharing
-host credentials is **opt-in**: three bind mounts (`~/.claude` writable, `~/.claude.json` and
-`~/.config/gh` read-only) ship commented out, and the user uncomments them after authenticating on
-the host — a bind mount requires its source to already exist, and host auth (`gh auth login`, Claude
-Code sign-in) is what creates those sources. There is intentionally no `initializeCommand`: with the
-mounts off there is nothing to pre-create, and the opt-in path relies on host auth instead. Lifecycle
-commands are guarded with `if [ -f package.json ]` so applying into an empty/non-JS repo doesn't fail.
+The template's `devcontainer.json` mounts **no host paths by default** — only two per-project
+named volumes — so it starts cleanly on any host and in any Dev Containers flow:
+
+- `${localWorkspaceFolderBasename}-zsh-history` → `/commandhistory`
+- `claude-code-config-${devcontainerId}` → `/home/node/.claude`
+
+The Claude one is the [documented way](https://code.claude.com/docs/en/devcontainer) to keep
+Claude Code's auth token, settings, session transcripts and prompt history across rebuilds;
+without it a **Rebuild Container** silently signs the user out. `${devcontainerId}` (not
+`${localWorkspaceFolderBasename}`) because same-named repos would otherwise share one volume —
+and both containers use `/workspaces/<basename>` as cwd, so their session transcripts would
+collide too. Two invariants follow, and the Dockerfile's final `RUN` exists for them:
+
+- **The mountpoint must exist in the image and be owned by `node`.** A named volume whose
+  mountpoint is missing is created root-owned and the first write fails with `EACCES` — the same
+  trap `/commandhistory` documents.
+- **It must be empty in the image.** Docker seeds a named volume from the image's directory
+  contents exactly once, at volume creation, and never again — anything baked in there would be
+  frozen into every user's volume forever. Hence `rm -rf` before the `mkdir`.
+
+Sharing host credentials is **opt-in** and now just one bind mount: `~/.config/gh` read-only,
+shipped commented out, uncommented after `gh auth login` on the host (a bind mount requires its
+source to already exist). There is deliberately **no `~/.claude` bind mount** — it would collide
+with the volume above on the same target, and Docker rejects duplicate mount targets. There is
+also no `~/.claude.json` mount: with `CLAUDE_CONFIG_DIR` set, Claude Code reads
+`$CLAUDE_CONFIG_DIR/.claude.json`, so a mount at `/home/node/.claude.json` is a path it never
+reads. There is intentionally no `initializeCommand`: with the mount off there is nothing to
+pre-create. Lifecycle commands are guarded with `if [ -f package.json ]` so applying into an
+empty/non-JS repo doesn't fail.
 
 ## Common pitfalls when editing the Dockerfile
 
@@ -225,7 +252,9 @@ want to edit a Dockerfile can pull instead of build. Everything else in it is a 
   Renovate's job. `renovate.json` disables the `devcontainer` manager for this one file to stop
   the shared preset's `docker:pinDigests` doing it here.
 - **Its `devcontainer.json` must carry anything the metadata label can't**: `name`, and the
-  commented-out host-credential mounts. See the metadata allowlist note above.
+  commented-out `~/.config/gh` host-credential mount. See the metadata allowlist note above.
+  The two named volumes are *not* restated here — they arrive via the metadata label, and
+  duplicating them would be a second source of truth that silently drifts.
 - **`update-skill.yaml` regenerates the skill once and mirrors it into this template.** If you
   add a third template that ships the skill, extend that copy step — the workflow's PR step
   already commits N files via the Git Data API.

@@ -3,32 +3,28 @@
 //
 // This is deliberately tiny. The image was built with `devcontainer build`, so
 // the extensions, editor settings, lifecycle commands, containerEnv, remoteUser
-// and the zsh-history volume all travel with it in a `devcontainer.metadata`
-// label and are applied automatically. See NOTES.md.
+// and both named volumes (Claude Code state, zsh history) all travel with it in
+// a `devcontainer.metadata` label and are applied automatically. See NOTES.md.
 {
   "name": "${localWorkspaceFolderBasename}",
   "image": "ghcr.io/andykenward/devcontainer-images/node:2",
 
-  // ── Host credential sharing (optional, OFF by default) ──────────────────
-  // These live here rather than in the image because JSONC comments are not
+  // ── Optional host-credential mount (OFF by default) ──────────────────────
+  // This lives here rather than in the image because JSONC comments are not
   // JSON, so a commented-out mount cannot be carried in the image's metadata
   // label. Mounts declared here are additive to the image's own.
   //
-  // To reuse your host Claude Code + gh credentials inside the container,
-  // authenticate once on the host (`gh auth login`, and sign in to Claude Code)
-  // so the source paths exist, then uncomment the three bind mounts below.
+  // Reuse the GitHub CLI login from your host. Run `gh auth login` on the host
+  // first — a bind mount requires its source to already exist — then uncomment
+  // it. Read-only, so container processes can't tamper with host auth. Claude
+  // Code needs no equivalent: it signs in inside the container, and the image's
+  // per-project `claude-code-config-${devcontainerId}` volume keeps it signed in
+  // across rebuilds.
   //
-  // Heads up if you commit them: everyone who opens this repo in a container
-  // then depends on the same host paths. A teammate who hasn't authenticated on
-  // their host will get `bind source path does not exist` on start — they fix it
-  // by authenticating on the host and rebuilding, or by re-commenting the mounts.
+  // Heads up if you commit it: everyone who opens this repo in a container then
+  // depends on the same host path. A teammate who hasn't run `gh auth login`
+  // will get `bind source path does not exist` on start.
   "mounts": [
-    // Claude Code credentials — read-only so container processes can't tamper
-    // with host auth.
-    // "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,readonly",
-    // Claude Code working state (projects, todos, memory) — must be writable.
-    // "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
-    // GitHub CLI credentials — read-only; re-auth on the host with `gh auth login`.
     // "source=${localEnv:HOME}/.config/gh,target=/home/node/.config/gh,type=bind,readonly"
   ]
 }

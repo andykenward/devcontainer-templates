@@ -42,6 +42,10 @@ check "remoteUser applied"   test "$(id -un)" = "node"
 check "containerEnv applied" test "${CLAUDE_CONFIG_DIR:-}" = "/home/node/.claude"
 check "autoupdater disabled" test "${DISABLE_AUTOUPDATER:-}" = "1"
 check "history volume mount" grep -q ' /commandhistory ' /proc/mounts
+# The claude volume is named with ${devcontainerId}. Seeing it mounted proves the
+# variable was baked into the label unsubstituted AND re-resolved at runtime.
+check "claude volume mount"  grep -q ' /home/node/.claude ' /proc/mounts
+check "claude vol writable"  touch /home/node/.claude/.write-check
 
 if [ "${fail}" -ne 0 ]; then
   echo "smoke test failed"

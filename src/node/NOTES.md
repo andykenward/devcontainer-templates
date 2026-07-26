@@ -15,9 +15,9 @@ menu — it has **no picker options**.
 - **zsh**: hand-rolled config (history on a named volume, autosuggestions,
   `vcs_info` prompt) — no oh-my-zsh.
 - **Claude Code**: installed with Anthropic's official native installer, pinned
-  to a specific version (no npm dependency, no unpinned `curl | bash`). Sharing
-  your host Claude Code / `gh` credentials into the container is **opt-in** — see
-  [Sharing host credentials](#sharing-host-credentials-optional) below.
+  to a specific version (no npm dependency, no unpinned `curl | bash`). Its state
+  survives rebuilds on a per-project named volume — see
+  [Claude Code state](#claude-code-state-persists-across-rebuilds) below.
 - **`gh` agent skill**: ships the [`gh` agent skill](https://github.com/cli/cli#agent-skills)
   from `cli/cli` as a project-scoped skill at `.claude/skills/gh/`, pinned to the
   same `gh` release as the CLI. It teaches agents (Claude Code and any other
@@ -30,24 +30,59 @@ menu — it has **no picker options**.
   [`andykenward/renovate-config`](https://github.com/andykenward/renovate-config)
   preset, so the applied repo keeps its pins current.
 
+## Claude Code state persists across rebuilds
+
+Sign in to Claude Code **inside** the container, once. A per-project named volume
+mounted at `/home/node/.claude` keeps you signed in, along with your settings,
+session transcripts and prompt history, so **Rebuild Container** no longer throws
+them away. This is the approach Anthropic
+[documents for dev containers](https://code.claude.com/docs/en/devcontainer#persist-authentication-and-settings-across-rebuilds).
+
+```jsonc
+"source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
+```
+
+`${devcontainerId}` is unique to this workspace, so two projects never share one
+volume — even if their folders happen to have the same name.
+
+Two things worth knowing:
+
+- **Nothing inside the container clears it.** To reset, remove the volume from
+  the host:
+
+  ```sh
+  docker volume ls | grep claude-code-config
+  docker volume rm claude-code-config-<id>
+  ```
+
+- **Moving or re-cloning the repo to a different path changes the id**, so the
+  old volume is orphaned and you'll be asked to sign in again. Your old sessions
+  aren't gone — they're in the previous volume, which you can rename back if you
+  need them.
+
+> [!IMPORTANT]
+> The volume holds an OAuth token and full session transcripts, unencrypted, and
+> it outlives the container. Anything a session read — a `.env` file, a printed
+> secret — is in there. Treat it like any other credential store on your machine,
+> and prefer this template only with repositories you trust.
+
 ## Sharing host credentials (optional)
 
 Out of the box the container mounts **no host paths**, so it starts cleanly on
 any host and in any Dev Containers flow. If you'd like the container to reuse the
-Claude Code and GitHub CLI credentials you're already signed into on the host:
+GitHub CLI login you already have on the host:
 
-1. **Authenticate on the host** so the source paths exist and carry real
+1. **Authenticate on the host** so the source path exists and carries real
    credentials (a bind mount requires its source to already exist):
 
    ```sh
    gh auth login          # writes ~/.config/gh
-   # Claude Code: sign in once on the host so ~/.claude.json / ~/.claude exist
    ```
 
-2. **Uncomment the three bind mounts** in `.devcontainer/devcontainer.json`
-   (they sit under the "Optional host-credential mounts" note) and rebuild the
-   container. They mount `~/.claude` writable and `~/.claude.json` /
-   `~/.config/gh` read-only.
+2. **Uncomment the bind mount** in `.devcontainer/devcontainer.json` (it sits
+   under the "Optional host-credential mount" note) and rebuild the container. It
+   mounts `~/.config/gh` read-only, so container processes can't tamper with your
+   host auth.
 
 3. **Keep the change local** (recommended in shared repos) so you don't commit a
    host-path dependency onto your teammates. There's no per-user override file
@@ -61,13 +96,16 @@ Claude Code and GitHub CLI credentials you're already signed into on the host:
 macOS/Linux hosts. This works best with the standard **Reopen in Container**
 flow, where `${localEnv:HOME}` resolves to your real host home.
 
+Claude Code needs no equivalent — it signs in inside the container and the volume
+above keeps it signed in.
+
 > [!IMPORTANT]
-> **If you commit the uncommented mounts**, everyone who opens the repo in a
-> container inherits the same host-path dependency. A teammate who hasn't signed
-> in on their host will hit `bind source path does not exist` when the container
+> **If you commit the uncommented mount**, everyone who opens the repo in a
+> container inherits the same host-path dependency. A teammate who hasn't run
+> `gh auth login` will hit `bind source path does not exist` when the container
 > starts. To resolve it, they can either authenticate on their host (step 1) and
-> rebuild, or re-comment the three mounts locally. Prefer keeping them commented
-> in shared repos and letting each person opt in on their own machine.
+> rebuild, or re-comment the mount locally. Prefer keeping it commented in shared
+> repos and letting each person opt in on their own machine.
 
 ## Applying it
 

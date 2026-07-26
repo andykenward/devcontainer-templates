@@ -178,3 +178,14 @@ ARG CLAUDE_CODE_VERSION=2.1.218
 ENV PATH="/home/node/.local/bin:$PATH"
 RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
     && claude --version
+
+# Claude Code state directory. devcontainer.json mounts a per-project named
+# volume here, so the mountpoint must exist and be owned by `node` in the image —
+# a volume whose mountpoint is missing from the image is created root-owned and
+# the first write fails with EACCES (same trap as /commandhistory above).
+#
+# It must also be EMPTY. Docker seeds a new named volume from the image's
+# directory contents exactly once, at volume creation, and never again — so
+# anything `claude --version` above happened to write here would be frozen into
+# every user's volume forever. The rm makes that deterministic.
+RUN rm -rf /home/node/.claude && mkdir -p /home/node/.claude

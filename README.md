@@ -40,8 +40,9 @@ It is built by CI from `src/node/.devcontainer/` — the *same* Dockerfile the
 template ships, never a copy — using `devcontainer build`, which bakes the
 template's `devcontainer.json` into the image as a `devcontainer.metadata`
 label. Extensions, settings, lifecycle commands, `containerEnv`, `remoteUser`
-and the zsh-history volume therefore come along with the image; a consuming
-`devcontainer.json` only needs the `image` line.
+and both per-project named volumes (Claude Code state, zsh history) therefore
+come along with the image; a consuming `devcontainer.json` only needs the `image`
+line.
 
 Tags: `X.Y.Z`, `X.Y`, `X`, `latest` on release; `edge` and `sha-<12>` on every
 push to `main`.
