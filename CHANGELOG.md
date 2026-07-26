@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/andykenward/devcontainer-templates/compare/v2.1.0...v3.0.0) (2026-07-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **node:** the shell-history volume is renamed from `<folder>-zsh-history` to `zsh-history-${devcontainerId}`. Existing history is not migrated; the old volume is orphaned and can be removed, or renamed onto the new name to keep it.
+
+### Features
+
+* **node:** persist Claude Code state and zsh history in per-project named volumes ([#51](https://github.com/andykenward/devcontainer-templates/issues/51)) ([f7d67a2](https://github.com/andykenward/devcontainer-templates/commit/f7d67a2b3093bcca91d1a6bc938ee2f2a50eade5))
+
 ## [2.1.0](https://github.com/andykenward/devcontainer-templates/compare/v2.0.0...v2.1.0) (2026-07-26)
 
 
