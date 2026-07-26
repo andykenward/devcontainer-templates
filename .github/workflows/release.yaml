@@ -1,8 +1,11 @@
-name: "(Release) Publish dev container image + templates"
+# Deliberately a noun phrase, not "Publish ...": this workflow always builds and
+# asserts, but only publishes on main. The jobs (plan / build / merge /
+# publish-templates) carry the verbs, and those are what show per-check.
+name: "(Release) Dev container image + templates"
 
-# Push-to-main is the only workable trigger. release-please creates its tag and
-# GitHub release using `secrets.GITHUB_TOKEN`, and events created by
-# GITHUB_TOKEN do not start other workflows — so `on: release` and
+# Push-to-main is the only workable trigger *for publishing*. release-please
+# creates its tag and GitHub release using `secrets.GITHUB_TOKEN`, and events
+# created by GITHUB_TOKEN do not start other workflows — so `on: release` and
 # `on: push: tags` would both silently never fire. The human merge of the
 # release PR *is* a push to main, so that is what we hook.
 on:
