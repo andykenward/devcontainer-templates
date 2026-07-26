@@ -9,7 +9,8 @@ published as OCI artifacts to `ghcr.io/andykenward/devcontainer-templates`. Ther
 application code — the "product" is the `src/<template>/` directories, which are copied
 verbatim into a user's project when they run `devcontainer templates apply`.
 
-Currently one template: `node`.
+Two templates, `node` and `node-image`, plus a prebuilt image published from the
+`node` template's build context to `ghcr.io/andykenward/devcontainer-images/node`.
 
 ## Repository layout that matters
 
@@ -211,7 +212,35 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
   stage, and the devcontainer CLI then targets it and hits a circular dependency. The index-digest
   approach on a plain `COPY --from` needs no extra stage.
 
+## The `node-image` template
+
+A thin template whose `.devcontainer/devcontainer.json` is essentially just
+`"image": "ghcr.io/andykenward/devcontainer-images/node:2"`. It exists so users who don't
+want to edit a Dockerfile can pull instead of build. Everything else in it is a copy of the
+`node` payload (`renovate.json`, `.claude/skills/gh/SKILL.md`, `NOTES.md`).
+
+- **It references a floating major tag, not a digest.** A digest or exact version would make
+  every image rebuild require a template release, and would break the PR smoke test (which
+  `docker tag`s the reference — impossible with `@sha256:`). Digest pinning is the consumer's
+  Renovate's job. `renovate.json` disables the `devcontainer` manager for this one file to stop
+  the shared preset's `docker:pinDigests` doing it here.
+- **Its `devcontainer.json` must carry anything the metadata label can't**: `name`, and the
+  commented-out host-credential mounts. See the metadata allowlist note above.
+- **`update-skill.yaml` regenerates the skill once and mirrors it into this template.** If you
+  add a third template that ships the skill, extend that copy step — the workflow's PR step
+  already commits N files via the Git Data API.
+
 ## Common pitfalls when editing `.github/workflows/test.yaml`
 
 - **Use `bash script.sh` instead of `./script.sh`**: The container is non-root and has no sudo.
   Run test scripts with `bash` rather than relying on execute permissions and chmod.
+- **Image-based templates are tested against a locally built image, never the published one.**
+  The "Build and locally tag the prebuilt image" step builds `src/node` and tags it with the
+  exact reference the template asks for; the devcontainer CLI does `docker inspect` before
+  `docker pull`, so `devcontainer up` resolves it locally. That is what lets a PR test its own
+  Dockerfile changes through the image path. The step is generic — it keys off the template
+  referencing `ghcr.io/andykenward/devcontainer-images/`, so it no-ops for `node`.
+- **The paths filter lists `src/node/.devcontainer/**` under `node-image` on purpose** — that
+  is where `node-image`'s image comes from, so a Dockerfile change must retest both.
+- **`${{ matrix.templates }}` is indirected through a job-level `TEMPLATE_ID` env var** in
+  `run:` blocks; zizmor flags direct interpolation as template injection.
