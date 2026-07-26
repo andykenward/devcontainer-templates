@@ -1,4 +1,4 @@
-name: "Update gh agent skill"
+name: "(Update) gh agent skill"
 # Keeps src/node/.claude/skills/gh/SKILL.md locked to the same gh release the
 # container ships. The skill is pinned (`--pin`), so `gh skill update` would skip
 # it by design — we regenerate with `gh skill install --pin` instead.

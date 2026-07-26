@@ -1,4 +1,4 @@
-name: "(Release) release-please"
+name: "(Release) Version + changelog"
 on:
   workflow_dispatch:
   push:

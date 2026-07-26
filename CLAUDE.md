@@ -63,6 +63,21 @@ node Dockerfile changes:
 Dependency bumps come from **Renovate** using the shared `andykenward/renovate-config` preset
 (external repo), which drives the version bumps that release-please then releases.
 
+### Workflow naming convention
+
+`name: "(Group) Sentence case"`, where Group is one of **Release / Test / Update / Claude**.
+GitHub sorts the Actions sidebar by name, so the prefix is what groups them.
+
+**The group describes purpose, never trigger.** Trigger-based names go stale the moment a
+trigger changes — `"PR - Test Updated Templates"` became wrong when `release.yaml` also
+started running on PRs, and `"(Release) Publish ..."` became wrong when it stopped always
+publishing. Don't reintroduce `PR -`, `Push -`, or a verb that only holds for one trigger.
+
+Only the `name:` is conformed. **Filenames are deliberately left alone** (including the
+`.yml`/`.yaml` split): renaming a workflow file orphans its run history, and `release.yaml`
+self-references its own path in `pull_request.paths`, so a rename there would silently stop it
+triggering on its own changes.
+
 ## The prebuilt image — design invariants
 
 `release.yaml` publishes `ghcr.io/andykenward/devcontainer-images/node` (multi-arch, amd64 +

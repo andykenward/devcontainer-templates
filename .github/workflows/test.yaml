@@ -1,4 +1,4 @@
-name: "PR - Test Updated Templates"
+name: "(Test) Templates"
 on:
   pull_request:
 

@@ -1,4 +1,4 @@
-name: "Update Documentation"
+name: "(Update) Template docs"
 on:
   push:
     branches:

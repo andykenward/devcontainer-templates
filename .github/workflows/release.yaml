@@ -1,7 +1,7 @@
 # Deliberately a noun phrase, not "Publish ...": this workflow always builds and
 # asserts, but only publishes on main. The jobs (plan / build / merge /
 # publish-templates) carry the verbs, and those are what show per-check.
-name: "(Release) Dev container image + templates"
+name: "(Release) Image + templates"
 
 # Push-to-main is the only workable trigger *for publishing*. release-please
 # creates its tag and GitHub release using `secrets.GITHUB_TOKEN`, and events
