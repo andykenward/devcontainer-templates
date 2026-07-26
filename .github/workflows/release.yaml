@@ -1,18 +1,369 @@
-name: "(Release) Release dev container templates"
+name: "(Release) Publish dev container image + templates"
+
+# Push-to-main is the only workable trigger. release-please creates its tag and
+# GitHub release using `secrets.GITHUB_TOKEN`, and events created by
+# GITHUB_TOKEN do not start other workflows — so `on: release` and
+# `on: push: tags` would both silently never fire. The human merge of the
+# release PR *is* a push to main, so that is what we hook.
 on:
   workflow_dispatch:
+    inputs:
+      force-semver-tags:
+        description: "Re-push X.Y.Z / X.Y / X / latest even if X.Y.Z already exists"
+        type: boolean
+        default: false
   push:
     branches:
       - main
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false # never cancel a half-finished publish
+
+env:
+  IMAGE: ghcr.io/andykenward/devcontainer-images/node
+  CACHE_IMAGE: ghcr.io/andykenward/devcontainer-images/node-buildcache
+  # We attach our own SLSA provenance + SBOM attestations below. Suppressing
+  # BuildKit's default attestations keeps each per-arch push a plain manifest
+  # rather than a 2-entry index, which makes the digest we read back
+  # unambiguously "the linux/<arch> image" and the merged index deterministic.
+  BUILDX_NO_DEFAULT_ATTESTATIONS: "1"
+
 jobs:
-  deploy:
+  # ── 1. Decide the version, and whether this push is a release ──────────────
+  plan:
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+      packages: read
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      publish-semver: ${{ steps.plan.outputs.publish-semver }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Authenticated even for the read-only probe below, to avoid anonymous
+      # GHCR pull limits.
+      - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4.5.1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve version and release status
+        id: plan
+        env:
+          FORCE: ${{ inputs.force-semver-tags }}
+        run: |
+          set -euo pipefail
+
+          # .release-please-manifest.json is release-please's canonical state.
+          # src/*/devcontainer-template.json $.version is a derived copy of it.
+          version="$(jq -r '."."' .release-please-manifest.json)"
+          if [ -z "${version}" ] || [ "${version}" = "null" ]; then
+            echo "could not read version from .release-please-manifest.json" >&2
+            exit 1
+          fi
+
+          # "Is this the release-PR merge?" is answered by asking the registry,
+          # which is idempotent and safe to re-run. On the very first run
+          # nothing is published yet, so the full semver set ships immediately
+          # and :1 exists from day one.
+          if [ "${FORCE:-false}" = "true" ]; then
+            semver=true
+          elif docker buildx imagetools inspect "${IMAGE}:${version}" >/dev/null 2>&1; then
+            semver=false
+          else
+            semver=true
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "publish-semver=${semver}" >> "$GITHUB_OUTPUT"
+          echo "version \`${version}\`, publish-semver \`${semver}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 2. Native per-arch build, push, and per-arch attestations ─────────────
+  build:
+    needs: [plan]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A docker-container driver builder is required: the default `docker`
+      # driver supports neither --platform nor `--cache-to type=registry`.
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          cache-binary: false # no restored cache on a publish workflow
+
+      - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4.5.1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # Keep `@0.88.0` a literal here: renovate.json's custom manager matches
+      # `npm install -g @devcontainers/cli@<version>`, and an ${ENV} reference
+      # would make it capture the variable name and drop the dependency.
+      - name: Install devcontainer CLI
+        run: npm install -g @devcontainers/cli@0.88.0
+
+      - name: Add OCI labels to a scratch copy of the build context
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          # `devcontainer build --label` is a no-op for Dockerfile-based configs
+          # in CLI 0.88.0 — additionalLabels is only wired up on the
+          # image+features build path — so OCI labels are appended to a
+          # throwaway copy of the context instead. src/node/ stays byte-identical
+          # to what users receive, so a locally built template image never gets
+          # this repo's provenance labels stamped on it.
+          #
+          # These LABELs extend the final stage. The CLI appends its own
+          # `FROM $_DEV_CONTAINERS_BASE_IMAGE AS dev_containers_target_stage`
+          # after them, which inherits image-config labels. This is not a
+          # trailing `FROM ... AS` stage of our own, so it does not trip the
+          # circular-dependency pitfall documented in CLAUDE.md.
+          cp -R src/node "${RUNNER_TEMP}/build-ctx"
+          {
+            echo ""
+            echo "LABEL org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+            echo "LABEL org.opencontainers.image.revision=${GITHUB_SHA}"
+            echo "LABEL org.opencontainers.image.version=${VERSION}"
+            echo "LABEL org.opencontainers.image.licenses=MIT"
+            echo "LABEL org.opencontainers.image.title=devcontainer-images/node"
+            echo "LABEL org.opencontainers.image.description=Prebuilt dev container image for the andykenward/devcontainer-templates node template"
+          } >> "${RUNNER_TEMP}/build-ctx/.devcontainer/Dockerfile"
+
+      - name: Build and push linux/${{ matrix.arch }}
+        id: build
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          arch_tag="${IMAGE}:ci-${GITHUB_SHA}-${ARCH}"
+
+          # `devcontainer build` (rather than plain `docker buildx build`) is
+          # what bakes devcontainer.json into the image's `devcontainer.metadata`
+          # label — that label is the entire point of the node-image template.
+          #
+          # --push rather than the canonical push-by-digest flow: CLI 0.88.0
+          # rejects --push together with --output, and has no --metadata-file
+          # passthrough, so the digest is read back from the registry below.
+          devcontainer build \
+            --workspace-folder "${RUNNER_TEMP}/build-ctx" \
+            --image-name "${arch_tag}" \
+            --platform "linux/${ARCH}" \
+            --cache-from "type=registry,ref=${CACHE_IMAGE}:${ARCH}" \
+            --cache-to "type=registry,ref=${CACHE_IMAGE}:${ARCH},mode=max,image-manifest=true,oci-mediatypes=true" \
+            --push
+
+          digest="$(docker buildx imagetools inspect "${arch_tag}" \
+            --format '{{json .Manifest}}' | jq -r '.digest')"
+          if [ -z "${digest}" ] || [ "${digest}" = "null" ]; then
+            echo "could not resolve digest for ${arch_tag}" >&2
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "linux/${ARCH} \`${digest}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Guards the two fragile mechanisms above: metadata baking (which the
+      # node-image template depends on entirely) and the scratch-copy LABEL
+      # append (which GHCR repository linking depends on).
+      - name: Assert devcontainer.metadata and OCI labels were baked
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          image_json="$(docker buildx imagetools inspect "${IMAGE}@${DIGEST}" --format '{{json .Image}}')"
+          for label in devcontainer.metadata org.opencontainers.image.source; do
+            if ! printf '%s' "${image_json}" | jq -e --arg l "${label}" \
+              'any(..|objects; has($l))' >/dev/null; then
+              echo "expected label '${label}' is missing from ${IMAGE}@${DIGEST}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Stage per-arch metadata
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/meta"
+          printf '%s' "${DIGEST}" > "${RUNNER_TEMP}/meta/digest-${ARCH}.txt"
+
+      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      # syft resolves IMAGE@<manifest-digest> to exactly that platform, so this
+      # SBOM is genuinely per-architecture.
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: ${{ runner.temp }}/meta/sbom-${{ matrix.arch }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+          syft-version: "v1.49.0"
+
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: ${{ runner.temp }}/meta/sbom-${{ matrix.arch }}.spdx.json
+          push-to-registry: true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-meta-${{ matrix.arch }}
+          path: ${{ runner.temp }}/meta/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── 3. Manifest list, index-level attestations, signature ─────────────────
+  merge:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: image-meta-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/meta
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          cache-binary: false
+
+      - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4.5.1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Create the multi-arch manifest list
+        id: merge
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          PUBLISH_SEMVER: ${{ needs.plan.outputs.publish-semver }}
+          META: ${{ runner.temp }}/meta
+        run: |
+          set -euo pipefail
+
+          tags=("edge" "sha-${GITHUB_SHA:0:12}")
+          if [ "${PUBLISH_SEMVER}" = "true" ]; then
+            tags+=("${VERSION}" "${VERSION%.*}" "${VERSION%%.*}" "latest")
+          fi
+
+          tag_args=()
+          for t in "${tags[@]}"; do tag_args+=(-t "${IMAGE}:${t}"); done
+
+          srcs=()
+          for f in "${META}"/digest-*.txt; do srcs+=("${IMAGE}@$(cat "${f}")"); done
+          if [ "${#srcs[@]}" -ne 2 ]; then
+            echo "expected 2 per-arch digests, got ${#srcs[@]}" >&2
+            exit 1
+          fi
+
+          # The image-config LABEL added at build time is what GHCR uses for
+          # repository linking; index annotations are what registry UIs and
+          # crane surface for a manifest list. Both, belt and braces.
+          docker buildx imagetools create \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --annotation "index:org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --annotation "index:org.opencontainers.image.version=${VERSION}" \
+            "${tag_args[@]}" "${srcs[@]}"
+
+          index_digest="$(docker buildx imagetools inspect "${IMAGE}:edge" \
+            --format '{{json .Manifest}}' | jq -r '.digest')"
+          if [ -z "${index_digest}" ] || [ "${index_digest}" = "null" ]; then
+            echo "could not resolve the index digest" >&2
+            exit 1
+          fi
+          echo "index-digest=${index_digest}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Published \`${IMAGE}\`"
+            echo ""
+            echo "index digest: \`${index_digest}\`"
+            echo ""
+            printf -- '- \`%s\`\n' "${tags[@]}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Index-level attestations are what `gh attestation verify oci://...:1`
+      # and `cosign verify` resolve a tag to. Without them, tag-based
+      # verification finds nothing.
+      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.merge.outputs.index-digest }}
+          push-to-registry: true
+
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.merge.outputs.index-digest }}
+          sbom-path: ${{ runner.temp }}/meta/sbom-amd64.spdx.json
+          push-to-registry: true
+
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.merge.outputs.index-digest }}
+          sbom-path: ${{ runner.temp }}/meta/sbom-arm64.spdx.json
+          push-to-registry: true
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: "v3.1.2"
+
+      - name: Sign the index (keyless, GitHub OIDC)
+        env:
+          DIGEST: ${{ steps.merge.outputs.index-digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+  # ── 4. Templates last, so the image tag the node-image template references
+  #       always exists before that template ships. Do not add
+  #       `if: always()` here — that reintroduces the race this ordering fixes.
+  publish-templates:
+    needs: [merge]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: "Publish"
         uses: devcontainers/action@1082abd5d2bf3a11abccba70eef98df068277772 # v1.4.3
