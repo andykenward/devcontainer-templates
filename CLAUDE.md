@@ -63,6 +63,21 @@ node Dockerfile changes:
 Dependency bumps come from **Renovate** using the shared `andykenward/renovate-config` preset
 (external repo), which drives the version bumps that release-please then releases.
 
+### Workflow naming convention
+
+`name: "(Group) Sentence case"`, where Group is one of **Release / Test / Update / Claude**.
+GitHub sorts the Actions sidebar by name, so the prefix is what groups them.
+
+**The group describes purpose, never trigger.** Trigger-based names go stale the moment a
+trigger changes — `"PR - Test Updated Templates"` became wrong when `release.yaml` also
+started running on PRs, and `"(Release) Publish ..."` became wrong when it stopped always
+publishing. Don't reintroduce `PR -`, `Push -`, or a verb that only holds for one trigger.
+
+Only the `name:` is conformed. **Filenames are deliberately left alone** (including the
+`.yml`/`.yaml` split): renaming a workflow file orphans its run history, and `release.yaml`
+self-references its own path in `pull_request.paths`, so a rename there would silently stop it
+triggering on its own changes.
+
 ## The prebuilt image — design invariants
 
 `release.yaml` publishes `ghcr.io/andykenward/devcontainer-images/node` (multi-arch, amd64 +
@@ -98,6 +113,14 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   events do not trigger workflows. The registry probe is the release detector.
 - **`publish-templates` has `needs: [merge]` on purpose.** Do not add `if: always()` — the
   ordering is what guarantees the image tag exists before a template referencing it ships.
+- **`plan` and `build` also run on PRs** that touch `release.yaml` or `src/node/.devcontainer/**`,
+  building both arches without pushing (`--push` omitted ⇒ the CLI passes `--load`, so the image
+  is inspectable locally). `merge` and every attestation/upload step is gated off. **Only main
+  writes the layer cache** — a PR must not be able to poison the cache release builds consume.
+  If you add a step here, ask whether it needs a `pull_request` gate.
+- **The assertion step is a real gate, not decoration.** It checks the four labels *and* that
+  `devcontainer.metadata` still carries the **unsubstituted** `${localWorkspaceFolderBasename}`
+  mount. Both halves are verified to fail when they should. Don't weaken it to a warning.
 
 ## The `node` template — design invariants
 
@@ -142,10 +165,33 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
 
 ## Common pitfalls when editing the Dockerfile
 
-- **Attestation API responses may be unavailable**: The GitHub CLI verification step fetches
-  attestations from the GitHub API. Not all releases have available attestations. Always include
-  error handling (jq returns `null` if missing) with a fallback to SHA256 verification instead
-  of failing closed. See the `gh` installation RUN block.
+- **The `gh` attestation check fails closed. Keep it that way.** The API is unauthenticated and
+  rate-limited per IP per hour, which shared CI runner pools exhaust (403), so the fetch retries.
+  If verification still cannot complete, the build **fails** — do not add a "proceed anyway"
+  branch. In particular, never "verify" the download against a digest computed from that same
+  download: it is a tautology that cannot fail. Any integrity fallback must compare against a
+  digest pinned *in this repo*.
+- **Three non-obvious facts about GitHub's attestations API**, each of which independently
+  breaks verification silently if you get it wrong:
+  1. `.attestations[].bundle` is **always null** and is gone from the documented schema. The
+     Sigstore bundle lives behind `.bundle_url`, snappy-compressed
+     (`Content-Type: application/x-snappy`) — hence the `python3-snappy` install/purge.
+  2. There are **several attestations per artifact**. `[0]` is the in-toto *release*
+     attestation with no transparency-log entry, so cosign fails with "not enough verified log
+     entries: 0 < 1". Select by `predicateType == "https://slsa.dev/provenance/v1"`; the order
+     is not guaranteed.
+  3. `cosign verify-blob-attestation` defaults to `--type custom` and rejects SLSA with
+     "invalid predicate type". It needs `--type slsaprovenance1`.
+
+  cli/cli's own "Verification of binaries" README section — which this block cites — assumes a
+  hand-downloaded `.sigstore.json` and omits `--type`, so it cannot be copied verbatim.
+  A successful verification prints `Verified OK`; if you don't see that line in the build log,
+  it did not verify.
+- **Declare `ARG TARGETARCH` *inside* the stage, not before the first `FROM`.** A pre-`FROM` ARG
+  is global scope and invisible inside a build stage, so `${TARGETARCH}` expands to empty and the
+  build quietly produces an arm64 image carrying an amd64 `gh` (exit 126 at `gh --version`). The
+  `${TARGETARCH:?...}` guard makes that loud. Any use of a predefined BuildKit arg
+  (`TARGETARCH`, `TARGETPLATFORM`, `BUILDPLATFORM`) needs its own in-stage `ARG` line.
 - **Use POSIX shell syntax, not bash**: The Dockerfile runs under `/bin/sh`. Avoid bash-only
   syntax like process substitution `<(...)`. Use pipes `echo ... | command` instead.
 - **The container has no `sudo`**: The image runs as non-root `node` by design. Tests and

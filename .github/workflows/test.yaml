@@ -1,4 +1,4 @@
-name: "PR - Test Updated Templates"
+name: "(Test) Templates"
 on:
   pull_request:
 
@@ -21,7 +21,8 @@ jobs:
     needs: [detect-changes]
     if: ${{ needs.detect-changes.outputs.templates != '[]' && needs.detect-changes.outputs.templates != '' }}
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # Deliberately NOT continue-on-error: a green tick over a failed smoke test
+    # is worse than no tick at all.
     strategy:
       matrix:
         templates: ${{ fromJSON(needs.detect-changes.outputs.templates) }}
