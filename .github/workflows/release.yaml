@@ -253,7 +253,7 @@ jobs:
           # one zsh-history volume and one Claude Code state volume — the latter
           # holding an OAuth token and every session transcript — all named after
           # this build's folder. Single-quoted so the shell leaves ${...} alone.
-          for mount in '${localWorkspaceFolderBasename}-zsh-history' \
+          for mount in 'zsh-history-${devcontainerId}' \
                        'claude-code-config-${devcontainerId}'; do
             if ! printf '%s' "${image_json}" | jq -e --arg m "${mount}" \
               '[..|objects|.["devcontainer.metadata"]?|select(.)][0] | fromjson

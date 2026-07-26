@@ -91,12 +91,12 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   That label is the entire reason the `node-image` template can be a two-line file. It is baked
   even with zero Features — the CLI always appends a `dev_containers_target_stage` carrying it.
 - **The metadata is baked from the *raw*, unsubstituted config**, and the consuming CLI
-  re-substitutes at runtime. So `${localWorkspaceFolderBasename}-zsh-history` and
+  re-substitutes at runtime. So `zsh-history-${devcontainerId}` and
   `claude-code-config-${devcontainerId}` stay literal in the label and resolve per-project.
   (Verified in CLI 0.88.0: `bn()` *composes* the substitution closure, and the image-label
   metadata is substituted through that same closure — so `${devcontainerId}` round-trips just
-  like the other variables.) If either ever bakes *substituted*, every consumer silently shares
-  one zsh-history volume and one Claude Code state volume — the latter holding an OAuth token
+  like any other variable.) If either ever bakes *substituted*, every consumer silently shares
+  one shell-history volume and one Claude Code state volume — the latter holding an OAuth token
   and every session transcript. The `build` job's assertion step catches regressions here.
 - **`name`, `build`, and JSONC comments are NOT baked** (the metadata allowlist excludes them).
   Consequence: if you add a host-credential mount or change `name` in
@@ -124,7 +124,7 @@ arm64). Constraints that are load-bearing, each verified against `@devcontainers
   If you add a step here, ask whether it needs a `pull_request` gate.
 - **The assertion step is a real gate, not decoration.** It checks the four labels *and* that
   `devcontainer.metadata` still carries **both** unsubstituted volume mounts
-  (`${localWorkspaceFolderBasename}-zsh-history`, `claude-code-config-${devcontainerId}`). Both
+  (`zsh-history-${devcontainerId}`, `claude-code-config-${devcontainerId}`). Both
   halves are verified to fail when they should. Don't weaken it to a warning. If you add a named
   volume to `src/node/.devcontainer/devcontainer.json`, add it to that loop.
 
@@ -164,16 +164,25 @@ point is reproducibility and supply-chain provenance, so when editing `src/node/
 The template's `devcontainer.json` mounts **no host paths by default** — only two per-project
 named volumes — so it starts cleanly on any host and in any Dev Containers flow:
 
-- `${localWorkspaceFolderBasename}-zsh-history` → `/home/node/.commandhistory`
+- `zsh-history-${devcontainerId}` → `/home/node/.commandhistory`
 - `claude-code-config-${devcontainerId}` → `/home/node/.claude`
 
 The Claude one is the [documented way](https://code.claude.com/docs/en/devcontainer) to keep
 Claude Code's auth token, settings, session transcripts and prompt history across rebuilds;
-without it a **Rebuild Container** silently signs the user out. `${devcontainerId}` (not
-`${localWorkspaceFolderBasename}`) because same-named repos would otherwise share one volume —
-and both containers use `/workspaces/<basename>` as cwd, so their session transcripts would
-collide too. Three invariants apply to **both** volumes; two of them are why the Dockerfile's
-final `RUN` exists:
+without it a **Rebuild Container** silently signs the user out.
+
+**Both are keyed by `${devcontainerId}`, never `${localWorkspaceFolderBasename}`** — keep it that
+way for any volume added later. The basename is not unique: two unrelated repos in different
+directories that happen to share a folder name would get the same volume. That matters for both
+of these. Claude's holds an OAuth token, and since both containers use `/workspaces/<basename>`
+as cwd their session transcripts would collide under the same `projects/<encoded-cwd>/` key;
+shell history routinely contains tokens pasted into `curl` or `gh` commands. `${devcontainerId}`
+is derived from the container's identifying labels, so it is unique per workspace. The cost is an
+opaque name in `docker volume ls` and a new id if the repo moves to a different host path —
+accepted deliberately.
+
+Three invariants apply to **both** volumes; two of them are why the Dockerfile's final `RUN`
+exists:
 
 - **Every volume mountpoint must live under `/home/node`.** This is the non-obvious one. When
   the host user's uid isn't 1000 — GitHub runners are 1001, as are many Linux dev machines — the

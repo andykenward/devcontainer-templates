@@ -26,8 +26,8 @@ has **no picker options**.
   release workflow. See [Verification of binaries](https://github.com/cli/cli#verification-of-binaries).
 - **prek** and **cosign**: copied as digest-pinned binaries from their official
   distroless images (no install script runs).
-- **zsh**: hand-rolled config (history on a named volume, autosuggestions,
-  `vcs_info` prompt) — no oh-my-zsh.
+- **zsh**: hand-rolled config (history on a per-project named volume,
+  autosuggestions, `vcs_info` prompt) — no oh-my-zsh.
 - **Claude Code**: installed with Anthropic's official native installer, pinned
   to a specific version. Its state survives rebuilds on a per-project named
   volume — see [Claude Code state](#claude-code-state-persists-across-rebuilds).
@@ -84,29 +84,37 @@ session transcripts and prompt history, so **Rebuild Container** no longer throw
 them away. This is the approach Anthropic
 [documents for dev containers](https://code.claude.com/docs/en/devcontainer#persist-authentication-and-settings-across-rebuilds).
 
-The mount arrives from the image's metadata label, so it is not in the
-`devcontainer.json` you were given. It is:
+Your zsh history persists the same way, on a second volume. Both mounts arrive
+from the image's metadata label, so neither is in the `devcontainer.json` you
+were given. They are:
 
 ```jsonc
 "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
+"source=zsh-history-${devcontainerId},target=/home/node/.commandhistory,type=volume"
 ```
 
 `${devcontainerId}` is resolved by your Dev Containers CLI, not baked into the
-image, so it is unique to *your* workspace — two projects never share one volume,
-even if their folders happen to have the same name.
+image, so it is unique to *your* workspace — two projects never share either
+volume, even if their folders happen to have the same name. That matters for
+both: one holds an auth token and your transcripts, and shell history routinely
+picks up tokens pasted into `curl` or `gh` commands.
+
+They are kept separate on purpose, so you can wipe your Claude Code state without
+losing your shell history, or the reverse.
 
 Two things worth knowing:
 
-- **Nothing inside the container clears it.** To reset, remove the volume from
-  the host:
+- **Nothing inside the container clears them.** To reset, remove the volume from
+  the host — `${devcontainerId}` resolves to an opaque hash, so list them first:
 
   ```sh
-  docker volume ls | grep claude-code-config
-  docker volume rm claude-code-config-<id>
+  docker volume ls | grep -E 'claude-code-config|zsh-history'
+  docker volume rm claude-code-config-<id>    # sign-in, settings, transcripts
+  docker volume rm zsh-history-<id>           # shell history only
   ```
 
 - **Moving or re-cloning the repo to a different path changes the id**, so the
-  old volume is orphaned and you'll be asked to sign in again. Your old sessions
+  old volumes are orphaned and you'll be asked to sign in again. Your old sessions
   aren't gone — they're in the previous volume, which you can rename back if you
   need them.
 

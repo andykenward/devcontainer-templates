@@ -68,9 +68,12 @@
     // the container clears it. https://code.claude.com/docs/en/devcontainer
     "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
 
-    // Per-project named volume for persistent zsh history across rebuilds.
-    // Derived from the folder name so each project gets its own history.
-    "source=${localWorkspaceFolderBasename}-zsh-history,target=/home/node/.commandhistory,type=volume"
+    // Persistent zsh history across rebuilds. Keyed by ${devcontainerId} for the
+    // same reason as the volume above: the folder name is not unique, and shell
+    // history routinely contains tokens pasted into `curl` or `gh` commands, so
+    // two unrelated projects that happen to share a folder name must not share
+    // one history file.
+    "source=zsh-history-${devcontainerId},target=/home/node/.commandhistory,type=volume"
   ],
 
   // Connect as the non-root `node` user (the Dockerfile's default USER). Set to
