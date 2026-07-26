@@ -167,10 +167,16 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
 
 ## Common pitfalls when editing the Dockerfile
 
-- **Attestation API responses may be unavailable**: The GitHub CLI verification step fetches
-  attestations from the GitHub API. Not all releases have available attestations. Always include
-  error handling (jq returns `null` if missing) with a fallback to SHA256 verification instead
-  of failing closed. See the `gh` installation RUN block.
+- **The `gh` attestation check fails closed. Keep it that way.** The API is unauthenticated and
+  rate-limited per source IP per hour, and shared CI runner pools do exhaust it (403), so the
+  fetch is wrapped in a retry loop. If it still cannot be verified, the build **fails** — do not
+  add a "proceed anyway" branch.
+  **Never reintroduce the old SHA256 fallback.** It computed the digest from the downloaded
+  tarball and then verified that same tarball against it — a tautology that could not fail and
+  proved nothing. It silently installed an unverified `gh` whenever attestations were
+  unavailable, which is precisely the threat this Dockerfile exists to defend against. Any
+  integrity fallback must compare against a digest pinned *in this repo*, not one derived from
+  the download.
 - **Declare `ARG TARGETARCH` *inside* the stage, not before the first `FROM`.** A pre-`FROM`
   ARG is global scope and is invisible inside a build stage. If `${TARGETARCH}` expands to
   empty, `arch="${TARGETARCH:-amd64}"` silently falls back to amd64 on *every* platform, and
