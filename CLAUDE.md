@@ -164,7 +164,7 @@ point is reproducibility and supply-chain provenance, so when editing `src/node/
 The template's `devcontainer.json` mounts **no host paths by default** — only two per-project
 named volumes — so it starts cleanly on any host and in any Dev Containers flow:
 
-- `${localWorkspaceFolderBasename}-zsh-history` → `/commandhistory`
+- `${localWorkspaceFolderBasename}-zsh-history` → `/home/node/.commandhistory`
 - `claude-code-config-${devcontainerId}` → `/home/node/.claude`
 
 The Claude one is the [documented way](https://code.claude.com/docs/en/devcontainer) to keep
@@ -172,14 +172,25 @@ Claude Code's auth token, settings, session transcripts and prompt history acros
 without it a **Rebuild Container** silently signs the user out. `${devcontainerId}` (not
 `${localWorkspaceFolderBasename}`) because same-named repos would otherwise share one volume —
 and both containers use `/workspaces/<basename>` as cwd, so their session transcripts would
-collide too. Two invariants follow, and the Dockerfile's final `RUN` exists for them:
+collide too. Three invariants apply to **both** volumes; two of them are why the Dockerfile's
+final `RUN` exists:
 
+- **Every volume mountpoint must live under `/home/node`.** This is the non-obvious one. When
+  the host user's uid isn't 1000 — GitHub runners are 1001, as are many Linux dev machines — the
+  CLI rebuilds the image through its `scripts/updateUID.Dockerfile`, which remaps `node` to the
+  host uid and then repairs ownership with `chown -R $NEW_UID:$NEW_GID $HOME_FOLDER`: the home
+  folder, and nothing else. A mountpoint outside it keeps uid 1000 and is silently unwritable for
+  exactly those users. `/commandhistory` was top-level and had this bug from the start; it is now
+  `~/.commandhistory`. Do not move either volume back out of the home directory, and do not add a
+  third one outside it.
 - **The mountpoint must exist in the image and be owned by `node`.** A named volume whose
-  mountpoint is missing is created root-owned and the first write fails with `EACCES` — the same
-  trap `/commandhistory` documents.
+  mountpoint is missing is created root-owned and the first write fails with `EACCES`.
 - **It must be empty in the image.** Docker seeds a named volume from the image's directory
   contents exactly once, at volume creation, and never again — anything baked in there would be
   frozen into every user's volume forever. Hence `rm -rf` before the `mkdir`.
+
+Both `test.sh` files assert each volume is *mounted* **and** *writable*. The writability half is
+what catches the uid trap; a mount check alone passes while history silently fails to persist.
 
 Sharing host credentials is **opt-in** and now just one bind mount: `~/.config/gh` read-only,
 shipped commented out, uncommented after `gh auth login` on the host (a bind mount requires its

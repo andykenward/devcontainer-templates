@@ -70,7 +70,7 @@
 
     // Per-project named volume for persistent zsh history across rebuilds.
     // Derived from the folder name so each project gets its own history.
-    "source=${localWorkspaceFolderBasename}-zsh-history,target=/commandhistory,type=volume"
+    "source=${localWorkspaceFolderBasename}-zsh-history,target=/home/node/.commandhistory,type=volume"
   ],
 
   // Connect as the non-root `node` user (the Dockerfile's default USER). Set to

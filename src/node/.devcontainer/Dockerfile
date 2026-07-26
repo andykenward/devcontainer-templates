@@ -18,13 +18,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && chsh -s /usr/bin/zsh node
 
-# Persisted zsh history. /commandhistory is mounted as a named volume in
+# Persisted zsh history. ~/.commandhistory is mounted as a named volume in
 # devcontainer.json so history survives container rebuilds. The directory must
 # exist and be owned by `node` before the volume mounts, otherwise the first
 # write fails with EACCES.
-RUN mkdir -p /commandhistory \
-    && touch /commandhistory/.zsh_history \
-    && chown -R node:node /commandhistory
+#
+# It must live INSIDE /home/node. When the host user's uid isn't 1000 (GitHub
+# runners are 1001, as are plenty of Linux dev machines) the CLI rebuilds this
+# image via its updateUID.Dockerfile, which remaps `node` to the host uid and
+# then repairs ownership with `chown -R $NEW_UID:$NEW_GID $HOME_FOLDER` — the
+# home folder and nothing else. A top-level /commandhistory would keep uid 1000,
+# leaving zsh unable to write history, silently, for exactly those users.
+RUN mkdir -p /home/node/.commandhistory \
+    && touch /home/node/.commandhistory/.zsh_history \
+    && chown -R node:node /home/node/.commandhistory
 
 # Shell config lives in a sibling file so it can be edited without escaping
 # shell quoting inside a Dockerfile RUN. See .devcontainer/zshrc.
@@ -182,7 +189,8 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
 # Claude Code state directory. devcontainer.json mounts a per-project named
 # volume here, so the mountpoint must exist and be owned by `node` in the image —
 # a volume whose mountpoint is missing from the image is created root-owned and
-# the first write fails with EACCES (same trap as /commandhistory above).
+# the first write fails with EACCES (same trap as ~/.commandhistory above, and
+# like it, this must stay under /home/node so the CLI's uid remap repairs it).
 #
 # It must also be EMPTY. Docker seeds a new named volume from the image's
 # directory contents exactly once, at volume creation, and never again — so

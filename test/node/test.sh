@@ -29,9 +29,9 @@ check "git"    git --version
 # Both mountpoints must exist in the image and be writable as `node`; a volume
 # whose mountpoint is missing is created root-owned and fails on first write.
 check "claude state volume" grep -q ' /home/node/.claude ' /proc/mounts
-check "history volume"      grep -q ' /commandhistory ' /proc/mounts
+check "history volume"      grep -q ' /home/node/.commandhistory ' /proc/mounts
 check "claude state writable" touch /home/node/.claude/.write-check
-check "history writable"      touch /commandhistory/.write-check
+check "history writable"      touch /home/node/.commandhistory/.write-check
 
 if [ "${fail}" -ne 0 ]; then
   echo "smoke test failed"

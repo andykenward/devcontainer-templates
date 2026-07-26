@@ -2,12 +2,14 @@
 # Installed to /home/node/.zshrc by .devcontainer/Dockerfile.
 
 # History persistence.
-# HISTFILE lives in /commandhistory, a named volume mounted by devcontainer.json
-# so history survives container rebuilds. SHARE_HISTORY writes each command to
-# the file immediately and makes it visible across concurrent shells (useful
-# when VS Code opens multiple terminals against the same container).
+# HISTFILE lives in ~/.commandhistory, a named volume mounted by
+# devcontainer.json so history survives container rebuilds. It is under $HOME
+# deliberately — see the Dockerfile for why anywhere else breaks when the host
+# uid isn't 1000. SHARE_HISTORY writes each command to the file immediately and
+# makes it visible across concurrent shells (useful when VS Code opens multiple
+# terminals against the same container).
 # HIST_IGNORE_DUPS drops a command if it matches the previous one.
-export HISTFILE=/commandhistory/.zsh_history
+export HISTFILE="${HOME}/.commandhistory/.zsh_history"
 export HISTSIZE=10000
 export SAVEHIST=10000
 setopt SHARE_HISTORY
