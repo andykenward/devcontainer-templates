@@ -1,7 +1,7 @@
 
-# Node — pinned toolchain, provenance-verified, with Claude Code (node)
+# Node (prebuilt image) — pinned toolchain, provenance-verified, with Claude Code (node-image)
 
-A reproducible Node dev container: digest-pinned node base, pnpm, prek, and a GitHub CLI verified via SLSA build provenance (cosign), plus zsh and the Claude Code CLI. Ships an optional renovate.json wired to a shared preset.
+The `node` template's toolchain as a prebuilt, signed, multi-arch image: pnpm, prek, a GitHub CLI verified via SLSA build provenance (cosign), zsh and the Claude Code CLI. No local build — the config, extensions and lifecycle commands travel with the image. Ships an optional renovate.json wired to a shared preset.
 
 ## Options
 
@@ -11,9 +11,23 @@ A reproducible Node dev container: digest-pinned node base, pnpm, prek, and a Gi
 
 ## Highlights
 
-A deliberately opinionated, fully pinned baseline rather than a configurable
-menu — it has **no picker options**.
+The same deliberately opinionated, fully pinned baseline as the
+[`node`](https://github.com/andykenward/devcontainer-templates/tree/main/src/node)
+template — but pulled as a prebuilt image instead of built on your machine. It
+has **no picker options**.
 
+- **Prebuilt and multi-arch**: `ghcr.io/andykenward/devcontainer-images/node:2`,
+  built for `linux/amd64` and `linux/arm64`. First start is a pull, not a
+  multi-minute build.
+- **The config travels with the image.** It is built with `devcontainer build`,
+  which bakes this repo's `devcontainer.json` into the image as a
+  `devcontainer.metadata` label — so the VS Code extensions and settings,
+  `postCreateCommand` / `updateContentCommand`, `containerEnv`, `remoteUser` and
+  both per-project named volumes (Claude Code state, zsh history) all arrive
+  automatically. That is why the `.devcontainer/devcontainer.json` you get is
+  only a few lines.
+- **Signed and attested**, with the same trust model the image uses internally to
+  verify `gh` — see [Verifying the image](#verifying-the-image) below.
 - **Base**: `node:24.18.0-bookworm-slim`, pinned by digest. Non-root `node` user.
 - **pnpm**: installed globally via npm (registry integrity hashes), not the
   remote install script and not Corepack.
@@ -26,20 +40,52 @@ menu — it has **no picker options**.
 - **zsh**: hand-rolled config (history on a per-project named volume,
   autosuggestions, `vcs_info` prompt) — no oh-my-zsh.
 - **Claude Code**: installed with Anthropic's official native installer, pinned
-  to a specific version (no npm dependency, no unpinned `curl | bash`). Its state
-  survives rebuilds on a per-project named volume — see
-  [Claude Code state](#claude-code-state-persists-across-rebuilds) below.
+  to a specific version. Its state survives rebuilds on a per-project named
+  volume — see [Claude Code state](#claude-code-state-persists-across-rebuilds).
 - **`gh` agent skill**: ships the [`gh` agent skill](https://github.com/cli/cli#agent-skills)
   from `cli/cli` as a project-scoped skill at `.claude/skills/gh/`, pinned to the
-  same `gh` release as the CLI. It teaches agents (Claude Code and any other
-  agent that reads `.claude/skills`) to drive `gh` well — structured `--json`
-  output, pagination, search vs list, `gh api` fallback. Because it is committed
-  into the applied repo it needs no network or credentials to be present, and the
-  whole team picks it up on `git pull`. Refresh it with `gh skill update gh`.
+  same `gh` release as the CLI in the image. It is deliberately committed into
+  your repo rather than baked into the image: `~/.claude` is a writable named
+  volume, which would shadow an image-baked user-scope skill — and worse, serve a
+  stale copy of it forever, since a volume seeds from the image only once.
+  Committed, it needs no network or credentials and the whole team picks it up on
+  `git pull`.
 - **Optional `renovate.json`**: applying the template offers to drop a root
   `renovate.json` that extends the shared
   [`andykenward/renovate-config`](https://github.com/andykenward/renovate-config)
   preset, so the applied repo keeps its pins current.
+
+## Which template do I want?
+
+Pick **`node`** if you intend to edit the Dockerfile — it puts the whole build in
+your repo, so you can add packages and tools freely.
+
+Pick **`node-image`** if you don't. It trades that away for a pull instead of a
+build. You can still layer on top later by switching your `devcontainer.json` to
+a `build.dockerfile` whose first line is
+`FROM ghcr.io/andykenward/devcontainer-images/node:2`.
+
+## Pinning
+
+The shipped reference is the floating major tag `:1`, so you keep getting patch
+and minor rebuilds. If you take the optional `renovate.json`, Renovate will pin
+it to `:1@sha256:…` in *your* repo on its first run and keep that digest fresh —
+which is where pinning belongs, since it records exactly what your project built
+against.
+
+## Verifying the image
+
+Every published index carries SLSA build provenance, an SBOM per architecture,
+and a keyless cosign signature:
+
+```sh
+gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:2 \
+  --repo andykenward/devcontainer-templates
+
+cosign verify ghcr.io/andykenward/devcontainer-images/node:2 \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp='^https://github.com/andykenward/devcontainer-templates/\.github/workflows/release\.yaml@.*'
+```
 
 ## Claude Code state persists across rebuilds
 
@@ -49,20 +95,20 @@ session transcripts and prompt history, so **Rebuild Container** no longer throw
 them away. This is the approach Anthropic
 [documents for dev containers](https://code.claude.com/docs/en/devcontainer#persist-authentication-and-settings-across-rebuilds).
 
+Your zsh history persists the same way, on a second volume. Both mounts arrive
+from the image's metadata label, so neither is in the `devcontainer.json` you
+were given. They are:
+
 ```jsonc
 "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
-```
-
-Your zsh history persists the same way, on a second volume:
-
-```jsonc
 "source=zsh-history-${devcontainerId},target=/home/node/.commandhistory,type=volume"
 ```
 
-`${devcontainerId}` is unique to this workspace, so two projects never share
-either volume — even if their folders happen to have the same name. That matters
-for both: one holds an auth token and your transcripts, and shell history
-routinely picks up tokens pasted into `curl` or `gh` commands.
+`${devcontainerId}` is resolved by your Dev Containers CLI, not baked into the
+image, so it is unique to *your* workspace — two projects never share either
+volume, even if their folders happen to have the same name. That matters for
+both: one holds an auth token and your transcripts, and shell history routinely
+picks up tokens pasted into `curl` or `gh` commands.
 
 They are kept separate on purpose, so you can wipe your Claude Code state without
 losing your shell history, or the reverse.
@@ -136,10 +182,10 @@ Pick it from **Dev Containers: Add Dev Container Configuration Files…**, or ap
 directly with the CLI:
 
 ```sh
-devcontainer templates apply -t ghcr.io/andykenward/devcontainer-templates/node
+devcontainer templates apply -t ghcr.io/andykenward/devcontainer-templates/node-image
 ```
 
 
 ---
 
-_Note: This file was auto-generated from the [devcontainer-template.json](https://github.com/andykenward/devcontainer-templates/blob/main/src/node/devcontainer-template.json).  Add additional notes to a `NOTES.md`._
+_Note: This file was auto-generated from the [devcontainer-template.json](https://github.com/andykenward/devcontainer-templates/blob/main/src/node-image/devcontainer-template.json).  Add additional notes to a `NOTES.md`._
