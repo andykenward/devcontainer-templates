@@ -7,7 +7,7 @@
 // label and are applied automatically. See NOTES.md.
 {
   "name": "${localWorkspaceFolderBasename}",
-  "image": "ghcr.io/andykenward/devcontainer-images/node:1",
+  "image": "ghcr.io/andykenward/devcontainer-images/node:2",
 
   // ── Host credential sharing (optional, OFF by default) ──────────────────
   // These live here rather than in the image because JSONC comments are not

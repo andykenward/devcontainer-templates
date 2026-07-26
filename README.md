@@ -33,7 +33,7 @@ The same toolchain is also published as a multi-arch (amd64 + arm64) container
 image, so you can skip the local build entirely:
 
 ```
-ghcr.io/andykenward/devcontainer-images/node:1
+ghcr.io/andykenward/devcontainer-images/node:2
 ```
 
 It is built by CI from `src/node/.devcontainer/` — the *same* Dockerfile the
@@ -49,10 +49,10 @@ push to `main`.
 The image is signed and attested the same way it verifies `gh`:
 
 ```sh
-gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:1 \
+gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:2 \
   --repo andykenward/devcontainer-templates
 
-cosign verify ghcr.io/andykenward/devcontainer-images/node:1 \
+cosign verify ghcr.io/andykenward/devcontainer-images/node:2 \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   --certificate-identity-regexp='^https://github.com/andykenward/devcontainer-templates/\.github/workflows/release\.yaml@.*'
 ```

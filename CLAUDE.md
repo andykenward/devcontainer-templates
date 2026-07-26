@@ -215,7 +215,7 @@ commands are guarded with `if [ -f package.json ]` so applying into an empty/non
 ## The `node-image` template
 
 A thin template whose `.devcontainer/devcontainer.json` is essentially just
-`"image": "ghcr.io/andykenward/devcontainer-images/node:1"`. It exists so users who don't
+`"image": "ghcr.io/andykenward/devcontainer-images/node:2"`. It exists so users who don't
 want to edit a Dockerfile can pull instead of build. Everything else in it is a copy of the
 `node` payload (`renovate.json`, `.claude/skills/gh/SKILL.md`, `NOTES.md`).
 

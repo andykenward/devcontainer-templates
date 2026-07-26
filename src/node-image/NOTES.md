@@ -5,7 +5,7 @@ The same deliberately opinionated, fully pinned baseline as the
 template — but pulled as a prebuilt image instead of built on your machine. It
 has **no picker options**.
 
-- **Prebuilt and multi-arch**: `ghcr.io/andykenward/devcontainer-images/node:1`,
+- **Prebuilt and multi-arch**: `ghcr.io/andykenward/devcontainer-images/node:2`,
   built for `linux/amd64` and `linux/arm64`. First start is a pull, not a
   multi-minute build.
 - **The config travels with the image.** It is built with `devcontainer build`,
@@ -49,7 +49,7 @@ your repo, so you can add packages and tools freely.
 Pick **`node-image`** if you don't. It trades that away for a pull instead of a
 build. You can still layer on top later by switching your `devcontainer.json` to
 a `build.dockerfile` whose first line is
-`FROM ghcr.io/andykenward/devcontainer-images/node:1`.
+`FROM ghcr.io/andykenward/devcontainer-images/node:2`.
 
 ## Pinning
 
@@ -65,10 +65,10 @@ Every published index carries SLSA build provenance, an SBOM per architecture,
 and a keyless cosign signature:
 
 ```sh
-gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:1 \
+gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:2 \
   --repo andykenward/devcontainer-templates
 
-cosign verify ghcr.io/andykenward/devcontainer-images/node:1 \
+cosign verify ghcr.io/andykenward/devcontainer-images/node:2 \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   --certificate-identity-regexp='^https://github.com/andykenward/devcontainer-templates/\.github/workflows/release\.yaml@.*'
 ```
