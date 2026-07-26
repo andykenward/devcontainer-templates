@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0](https://github.com/andykenward/devcontainer-templates/compare/v1.3.0...v2.0.0) (2026-07-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* builds now fail if gh's build provenance cannot be verified, where previously they silently continued with an unverified binary.
+
+### Features
+
+* **ci:** publish a prebuilt multi-arch node image to GHCR ([#42](https://github.com/andykenward/devcontainer-templates/issues/42)) ([1d01e48](https://github.com/andykenward/devcontainer-templates/commit/1d01e48641fd829c0d582496b78e3cd519541fe5))
+
+
+### Bug Fixes
+
+* **ci:** quote OCI label values in the image build ([#45](https://github.com/andykenward/devcontainer-templates/issues/45)) ([8bbe12e](https://github.com/andykenward/devcontainer-templates/commit/8bbe12e42f40fd7da421a6ad978dd94ef5386716))
+
+
+### Continuous Integration
+
+* build the image on pull requests + fix arm64 gh install ([#46](https://github.com/andykenward/devcontainer-templates/issues/46)) ([c321988](https://github.com/andykenward/devcontainer-templates/commit/c32198813db9efc689fc664178a56cd37f76fa77))
+
 ## [1.3.0](https://github.com/andykenward/devcontainer-templates/compare/v1.2.1...v1.3.0) (2026-07-24)
 
 
