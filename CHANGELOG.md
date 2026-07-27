@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.0](https://github.com/andykenward/devcontainer-templates/compare/v3.0.0...v3.1.0) (2026-07-27)
+
+
+### Features
+
+* release-please maintains the node-image major tag ([#56](https://github.com/andykenward/devcontainer-templates/issues/56)) ([bfcd160](https://github.com/andykenward/devcontainer-templates/commit/bfcd160f64fab94dd7a6bcb854d6e545252b7b6d))
+
+
+### Bug Fixes
+
+* force generic updater on JSONC extra-file ([#57](https://github.com/andykenward/devcontainer-templates/issues/57)) ([308a135](https://github.com/andykenward/devcontainer-templates/commit/308a13565c6b812513530027cbe101fd28ea1b17))
+
 ## [3.0.0](https://github.com/andykenward/devcontainer-templates/compare/v2.1.0...v3.0.0) (2026-07-26)
 
 
