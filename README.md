@@ -36,9 +36,13 @@ template's auto-generated `README.md`.
 The same toolchain is also published as a multi-arch (amd64 + arm64) container
 image, so you can skip the local build entirely:
 
+<!-- x-release-please-start-major -->
+
 ```
-ghcr.io/andykenward/devcontainer-images/node:2
+ghcr.io/andykenward/devcontainer-images/node:3
 ```
+
+<!-- x-release-please-end -->
 
 It is built by CI from `src/node/.devcontainer/` — the *same* Dockerfile the
 template ships, never a copy — using `devcontainer build`, which bakes the
@@ -53,25 +57,33 @@ push to `main`.
 
 The image is signed and attested the same way it verifies `gh`:
 
+<!-- x-release-please-start-major -->
+
 ```sh
-gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:2 \
+gh attestation verify oci://ghcr.io/andykenward/devcontainer-images/node:3 \
   --repo andykenward/devcontainer-templates
 
-cosign verify ghcr.io/andykenward/devcontainer-images/node:2 \
+cosign verify ghcr.io/andykenward/devcontainer-images/node:3 \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   --certificate-identity-regexp='^https://github.com/andykenward/devcontainer-templates/\.github/workflows/release\.yaml@.*'
 ```
+
+<!-- x-release-please-end -->
 
 **Which do I want?** Use the `node` template if you intend to edit the
 Dockerfile — you get the whole build in your repo. Use `node-image` if you
 don't: it trades a multi-minute first build for a pull.
 
-The shipped reference is the floating major tag `:2`, deliberately. The
-Dockerfile behind it is fully pinned, so `:2` is reproducible *content*, and
+<!-- x-release-please-start-major -->
+
+The shipped reference is the floating major tag `:3`, deliberately. The
+Dockerfile behind it is fully pinned, so `:3` is reproducible *content*, and
 applied projects that take the optional `renovate.json` get their own Renovate
-pinning it to `:2@sha256:…` — which is where a digest pin belongs. Renovate is
+pinning it to `:3@sha256:…` — which is where a digest pin belongs. Renovate is
 disabled for that reference in *this* repo, since pinning it here would churn a
 release on every image rebuild.
+
+<!-- x-release-please-end -->
 
 ## Dependency updates
 
