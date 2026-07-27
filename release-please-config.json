@@ -15,7 +15,11 @@
           "type": "json",
           "path": "src/node-image/devcontainer-template.json",
           "jsonpath": "$.version"
-        }
+        },
+        "src/node-image/.devcontainer/devcontainer.json",
+        "src/node-image/NOTES.md",
+        "src/node-image/README.md",
+        "README.md"
       ]
     }
   }

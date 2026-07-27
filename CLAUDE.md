@@ -48,6 +48,8 @@ node Dockerfile changes:
 1. **release-please** (`release-please.yaml`) — opens/maintains a release PR. Merging it tags a
    release and, via `release-please-config.json`'s `extra-files`, bumps `$.version` in
    `src/node/devcontainer-template.json`. The version bump is what ships a change.
+   `extra-files` also carries the **floating-major image tag** — see "Bumping the image's major
+   tag" below.
 2. **release** (`release.yaml`) — builds and publishes the prebuilt image, **then** publishes
    `./src` templates to GHCR. Four jobs: `plan` (resolve version + decide whether this push is
    the release-PR merge) → `build` (matrix: amd64 on `ubuntu-latest`, arm64 on
@@ -63,6 +65,37 @@ node Dockerfile changes:
 
 Dependency bumps come from **Renovate** using the shared `andykenward/renovate-config` preset
 (external repo), which drives the version bumps that release-please then releases.
+
+### Bumping the image's major tag
+
+`node-image` ships `ghcr.io/andykenward/devcontainer-images/node:<major>`, and that major must
+track this repo's own major version. It is **not** maintained by hand — release-please rewrites
+every occurrence via `extra-files`. A path listed as a bare string (not a `{type, path, jsonpath}`
+object) gets release-please's **Generic** updater, which acts only on lines carrying an
+annotation:
+
+- `x-release-please-major` on the line → replace the first integer on **that line**.
+- `x-release-please-start-major` … `x-release-please-end` → same replacement on **every line
+  between the markers**.
+
+Annotated today: `src/node-image/.devcontainer/devcontainer.json` (a trailing JSONC comment),
+plus `src/node-image/NOTES.md`, its generated `README.md`, and the root `README.md` (HTML
+comments, invisible when rendered). Both README copies are listed so the release PR is
+self-consistent; `NOTES.md` is still the source the generator reads.
+
+Three things to know before touching this:
+
+- **The replacement regex is `/\d+\b/` — the first digit run on the line, whatever it is.** So a
+  block must not span a line containing any other number. Wrapping the "Prebuilt and multi-arch"
+  bullet in a block would rewrite `linux/amd64` to `linux/amd3`. Where a line has a stray digit,
+  use the inline form; where the tag sits inside a fenced code block (no comment syntax available
+  without it showing in rendered output), put the block markers *outside* the fence and check
+  every line in between for digits first.
+- **Only the major is annotated, so non-major releases are no-ops** — a `3.0.1` release rewrites
+  `3` with `3`. Re-running is safe and produces no diff.
+- **Nothing breaks at the boundary.** On a major release the same commit bumps the template
+  version and the tag, and `publish-templates` `needs: [merge]`, so the new `:N` image tag is in
+  the registry before a template referencing it ships.
 
 ### Workflow naming convention
 
@@ -261,8 +294,8 @@ empty/non-JS repo doesn't fail.
 
 ## The `node-image` template
 
-A thin template whose `.devcontainer/devcontainer.json` is essentially just
-`"image": "ghcr.io/andykenward/devcontainer-images/node:2"`. It exists so users who don't
+A thin template whose `.devcontainer/devcontainer.json` is essentially just an `image:` line
+pointing at `ghcr.io/andykenward/devcontainer-images/node:<major>`. It exists so users who don't
 want to edit a Dockerfile can pull instead of build. Everything else in it is a copy of the
 `node` payload (`renovate.json`, `.claude/skills/gh/SKILL.md`, `NOTES.md`).
 
@@ -271,6 +304,9 @@ want to edit a Dockerfile can pull instead of build. Everything else in it is a 
   `docker tag`s the reference — impossible with `@sha256:`). Digest pinning is the consumer's
   Renovate's job. `renovate.json` disables the `devcontainer` manager for this one file to stop
   the shared preset's `docker:pinDigests` doing it here.
+  **Deliberately no literal major version anywhere in this file** — quoting one here just adds
+  another copy to forget. `:1` survived in `NOTES.md` through the whole 2.x line for exactly
+  that reason.
 - **Its `devcontainer.json` must carry anything the metadata label can't**: `name`, and the
   commented-out `~/.config/gh` host-credential mount. See the metadata allowlist note above.
   The two named volumes are *not* restated here — they arrive via the metadata label, and

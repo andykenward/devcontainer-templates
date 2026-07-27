@@ -7,7 +7,12 @@
 // a `devcontainer.metadata` label and are applied automatically. See NOTES.md.
 {
   "name": "${localWorkspaceFolderBasename}",
-  "image": "ghcr.io/andykenward/devcontainer-images/node:2",
+
+  // A floating major tag, so patch and minor image rebuilds reach you without a
+  // template release. Pin it to a digest in your own repo if you want that — see
+  // "Pinning" in README.md. The trailing marker belongs to the template repo's
+  // release automation, which rewrites this number; it means nothing here.
+  "image": "ghcr.io/andykenward/devcontainer-images/node:3", // x-release-please-major
 
   // ── Optional host-credential mount (OFF by default) ──────────────────────
   // This lives here rather than in the image because JSONC comments are not
