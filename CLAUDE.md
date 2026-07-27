@@ -70,9 +70,8 @@ Dependency bumps come from **Renovate** using the shared `andykenward/renovate-c
 
 `node-image` ships `ghcr.io/andykenward/devcontainer-images/node:<major>`, and that major must
 track this repo's own major version. It is **not** maintained by hand — release-please rewrites
-every occurrence via `extra-files`. A path listed as a bare string (not a `{type, path, jsonpath}`
-object) gets release-please's **Generic** updater, which acts only on lines carrying an
-annotation:
+every occurrence via `extra-files`, using its **Generic** updater, which acts only on lines
+carrying an annotation:
 
 - `x-release-please-major` on the line → replace the first integer on **that line**.
 - `x-release-please-start-major` … `x-release-please-end` → same replacement on **every line
@@ -83,8 +82,17 @@ plus `src/node-image/NOTES.md`, its generated `README.md`, and the root `README.
 comments, invisible when rendered). Both README copies are listed so the release PR is
 self-consistent; `NOTES.md` is still the source the generator reads.
 
-Three things to know before touching this:
+Four things to know before touching this:
 
+- **Every one of those entries must be `{"type": "generic", "path": …}`, never a bare string.**
+  The schema's description for a bare string ("The `Generic` updater uses annotations…") is only
+  true for extensions release-please doesn't recognize. A bare string ending in
+  `.json`/`.yaml`/`.yml`/`.toml`/`.xml` is routed to a `CompositeUpdater` that runs
+  `GenericJson('$.version')` — a strict `JSON.parse` — *before* the annotation pass. On a JSONC
+  file that throws, and it does not fail soft: the whole `release-please` job dies with
+  `Unexpected token '/', "// Dev Con"... is not valid JSON` and **no release PR is created**. It
+  broke `main` once already. The explicit `generic` type skips the parse entirely (needs
+  release-please ≥ 17, verified present in the 17.6.0 the pinned action runs).
 - **The replacement regex is `/\d+\b/` — the first digit run on the line, whatever it is.** So a
   block must not span a line containing any other number. Wrapping the "Prebuilt and multi-arch"
   bullet in a block would rewrite `linux/amd64` to `linux/amd3`. Where a line has a stray digit,

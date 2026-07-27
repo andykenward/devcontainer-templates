@@ -16,10 +16,22 @@
           "path": "src/node-image/devcontainer-template.json",
           "jsonpath": "$.version"
         },
-        "src/node-image/.devcontainer/devcontainer.json",
-        "src/node-image/NOTES.md",
-        "src/node-image/README.md",
-        "README.md"
+        {
+          "type": "generic",
+          "path": "src/node-image/.devcontainer/devcontainer.json"
+        },
+        {
+          "type": "generic",
+          "path": "src/node-image/NOTES.md"
+        },
+        {
+          "type": "generic",
+          "path": "src/node-image/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "README.md"
+        }
       ]
     }
   }
