@@ -292,7 +292,7 @@ jobs:
           output-file: ${{ runner.temp }}/meta/sbom-${{ matrix.arch }}.spdx.json
           upload-artifact: false
           upload-release-assets: false
-          syft-version: "v1.49.0"
+          syft-version: "v1.50.0"
 
       - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         if: ${{ github.event_name != 'pull_request' }}
