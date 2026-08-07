@@ -100,11 +100,23 @@ using the shared preset in the `andykenward/renovate-config` repo:
 - **Custom managers (in this repo's `renovate.json`)**: the devcontainer CLI,
   syft, and cosign pins inside the workflows.
 
-When Renovate's conventional-commit PRs land, **release-please** bumps this
-collection's own `version` — one root version, written into *both* templates'
+Renovate opens these as `chore(deps)`, which does **not** cut a release. A bump
+that touches `src/**` — the payload, or the Dockerfile behind the image — needs
+retitling to `fix(deps)` before merge; see [Releasing](#releasing) below.
+
+Once a releasing commit lands, **release-please** bumps this collection's own
+`version` — one root version, written into *both* templates'
 `devcontainer-template.json` via `extra-files` — and cuts a release; the publish
 workflow then republishes to GHCR (it won't republish an existing version, so the
 bump is what ships changes) and pushes the matching semver image tags.
+
+## Releasing
+
+Releases are cut by release-please from the conventional-commit type on the
+squashed PR title — `feat:` and `fix:` ship, `chore:` and `ci:` deliberately do
+not, which is why dependency PRs need a look before merging.
+[`RELEASING.md`](RELEASING.md) covers the flow, what "released" means for each
+consumer, and how to recover a change merged under a non-releasing type.
 
 ## One-time setup runbook
 

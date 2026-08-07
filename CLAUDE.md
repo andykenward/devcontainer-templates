@@ -66,6 +66,19 @@ node Dockerfile changes:
 Dependency bumps come from **Renovate** using the shared `andykenward/renovate-config` preset
 (external repo), which drives the version bumps that release-please then releases.
 
+**Renovate labels every bump `chore(deps)`, and a `chore` is not releasable — so a Renovate PR
+touching `src/**` must be retitled to `fix` before merging.** Merges are squashed, so the PR
+title is the commit subject release-please reads. `release-type: simple` treats only
+feat/fix/breaking as user-facing; on a run with nothing else, release-please logs `No user facing
+commits found since <sha> - skipping` and opens no PR. Without a version bump
+`publish-templates` won't republish (it never overwrites an existing version) and `plan`'s
+registry probe won't re-tag `X.Y.Z`/`X.Y`/`X`/`latest`, so a Dockerfile bump reaches `edge` and
+`sha-<12>` only and no user sees it. Bumps confined to `.github/**` stay `chore` — they change
+how things are built, not what ships. `RELEASING.md` is the human-facing version of this.
+
+The retitle is deliberately left to a human. Automating it with a `semanticCommitType` rule in
+`renovate.json` was proposed and rejected — don't add one back without asking.
+
 ### Bumping the image's major tag
 
 `node-image` ships `ghcr.io/andykenward/devcontainer-images/node:<major>`, and that major must
