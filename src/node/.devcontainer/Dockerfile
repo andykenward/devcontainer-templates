@@ -181,7 +181,7 @@ WORKDIR /workspace
 # Renovate bumps CLAUDE_CODE_VERSION; the native channel tracks the
 # @anthropic-ai/claude-code package versions (npm datasource).
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.220
+ARG CLAUDE_CODE_VERSION=2.1.222
 ENV PATH="/home/node/.local/bin:$PATH"
 RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
     && claude --version
