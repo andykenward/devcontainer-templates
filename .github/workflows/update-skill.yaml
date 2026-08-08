@@ -24,6 +24,11 @@ jobs:
     if: "github.ref == 'refs/heads/main'"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The branch and PR below are created through the Git database API with
+          # an explicit GITHUB_TOKEN, never `git push` — see the comment there for
+          # why. `git diff` needs no credentials, so don't persist any.
+          persist-credentials: false
 
       - name: Read pinned GH_VERSION from the Dockerfile
         id: ghver

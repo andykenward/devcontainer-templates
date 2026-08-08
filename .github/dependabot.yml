@@ -4,13 +4,21 @@
 # https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 # https://containers.dev/guide/dependabot
 
+# Every entry carries a `cooldown`: a freshly published version is not proposed
+# until it has been out for 7 days, so a compromised release has a window to be
+# yanked before Dependabot opens a PR for it. Neither of these ecosystems
+# supports the `semver-*-days` keys — `default-days` is the only valid form.
 version: 2
 updates:
  - package-ecosystem: "devcontainers"
    directory: "/"
    schedule:
      interval: weekly
+   cooldown:
+     default-days: 7
  - package-ecosystem: "github-actions"
    directory: "/"
    schedule:
      interval: weekly
+   cooldown:
+     default-days: 7

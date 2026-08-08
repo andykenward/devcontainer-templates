@@ -31,6 +31,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
+          # claude-code-action unsets the http.<server>/.extraheader that
+          # actions/checkout persists and backs git with its own token instead
+          # (replaceCheckoutCredentials), so persisting one only leaves a token
+          # in .git/config for the tools Claude runs inside this tree.
+          persist-credentials: false
 
       - name: Run Claude Code Review
         id: claude-review
