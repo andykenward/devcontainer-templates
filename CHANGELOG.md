@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/andykenward/devcontainer-templates/compare/v3.1.0...v3.2.0) (2026-08-08)
+
+
+### Features
+
+* **deps:** update dependency @anthropic-ai/claude-code to v2.1.222 ([#67](https://github.com/andykenward/devcontainer-templates/issues/67)) ([d518fa1](https://github.com/andykenward/devcontainer-templates/commit/d518fa1a625fbac4e02cc604a0a55a48e8b6e641))
+
 ## [3.1.0](https://github.com/andykenward/devcontainer-templates/compare/v3.0.0...v3.1.0) (2026-07-27)
 
 
