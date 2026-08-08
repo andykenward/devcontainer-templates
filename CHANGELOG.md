@@ -7,6 +7,16 @@
 
 * **deps:** update dependency @anthropic-ai/claude-code to v2.1.222 ([#67](https://github.com/andykenward/devcontainer-templates/issues/67)) ([d518fa1](https://github.com/andykenward/devcontainer-templates/commit/d518fa1a625fbac4e02cc604a0a55a48e8b6e641))
 
+
+### Bug Fixes
+
+* **deps:** update dependency @anthropic-ai/claude-code to v2.1.220 ([#55](https://github.com/andykenward/devcontainer-templates/issues/55)) ([59abc14](https://github.com/andykenward/devcontainer-templates/commit/59abc144fb0b3c46745e7b24c9ae1644a6078266))
+* **deps:** update dependency cli/cli to v2.97.0 ([#64](https://github.com/andykenward/devcontainer-templates/issues/64)) ([afacba3](https://github.com/andykenward/devcontainer-templates/commit/afacba3613592aee7bf66d537a008fe3e5176ac9))
+* **deps:** update dependency pnpm to v11.20.0 ([#61](https://github.com/andykenward/devcontainer-templates/issues/61)) ([63de584](https://github.com/andykenward/devcontainer-templates/commit/63de5842ed851467636b513fc24ccde4e36a8f35))
+* **deps:** update node.js to v24.18.1 ([#63](https://github.com/andykenward/devcontainer-templates/issues/63)) ([429a3de](https://github.com/andykenward/devcontainer-templates/commit/429a3dea8f07ccd9e46ca977c4c2d2a39d4f960f))
+* **deps:** update node.js to v24.19.0 ([#70](https://github.com/andykenward/devcontainer-templates/issues/70)) ([4d70025](https://github.com/andykenward/devcontainer-templates/commit/4d7002507c844bea1d62cf6722d4fc44dc7a8b3b))
+* regenerate gh agent skill for gh v2.97.0 ([#68](https://github.com/andykenward/devcontainer-templates/issues/68)) ([940d277](https://github.com/andykenward/devcontainer-templates/commit/940d2770519c9b5fa63feb1fa436790c73e68ed7))
+
 ## [3.1.0](https://github.com/andykenward/devcontainer-templates/compare/v3.0.0...v3.1.0) (2026-07-27)
 
 
