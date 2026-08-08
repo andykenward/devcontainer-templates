@@ -40,6 +40,10 @@ jobs:
       TEMPLATE_ID: ${{ matrix.templates }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here talks to the remote — the job builds and smoke-tests the
+          # checkout locally — so don't leave the token in .git/config.
+          persist-credentials: false
 
       - name: "Install devcontainer CLI"
         run: npm install -g @devcontainers/cli@0.88.0
