@@ -12,15 +12,6 @@
 		"DISABLE_AUTOUPDATER": "1"
 	},
 	"postCreateCommand": "npm install -g @devcontainers/cli",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"mads-hartmann.bash-ide-vscode",
-				"dbaeumer.vscode-eslint",
-				"editorconfig.editorconfig"
-			]
-		}
-	},
 	"mounts": [
     // Claude Code state — the auth token, settings, session transcripts, auto
     // memory and prompt history all live under CLAUDE_CONFIG_DIR (set above), so
