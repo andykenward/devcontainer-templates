@@ -13,19 +13,38 @@
 	},
 	"postCreateCommand": "npm install -g @devcontainers/cli",
 	"mounts": [
-    // Claude Code state — the auth token, settings, session transcripts, auto
-    // memory and prompt history all live under CLAUDE_CONFIG_DIR (set above), so
-    // this volume is what stops a rebuild signing you out and losing your
-    // sessions. ${devcontainerId} is unique to this workspace, so two projects
-    // never share one volume. Reset it with `docker volume rm` — nothing inside
-    // the container clears it. https://code.claude.com/docs/en/devcontainer
-    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
-    // Persistent zsh history across rebuilds. Keyed by ${devcontainerId} for the
-    // same reason as the volume above: the folder name is not unique, and shell
-    // history routinely contains tokens pasted into `curl` or `gh` commands, so
-    // two unrelated projects that happen to share a folder name must not share
-    // one history file.
-    "source=zsh-history-${devcontainerId},target=/home/node/.commandhistory,type=volume"
+		// Claude Code state — the auth token, settings, session transcripts, auto
+		// memory and prompt history all live under CLAUDE_CONFIG_DIR (set above), so
+		// this volume is what stops a rebuild signing you out and losing your
+		// sessions. ${devcontainerId} is unique to this workspace, so two projects
+		// never share one volume. Reset it with `docker volume rm` — nothing inside
+		// the container clears it. https://code.claude.com/docs/en/devcontainer
+		"source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
+		// Persistent zsh history across rebuilds. Keyed by ${devcontainerId} for the
+		// same reason as the volume above: the folder name is not unique, and shell
+		// history routinely contains tokens pasted into `curl` or `gh` commands, so
+		// two unrelated projects that happen to share a folder name must not share
+		// one history file.
+		"source=zsh-history-${devcontainerId},target=/home/node/.commandhistory,type=volume"
 	],
-	"remoteUser": "node"
+	"remoteUser": "node",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"Anthropic.claude-code",
+				"GitHub.vscode-pull-request-github",
+				"eamodio.gitlens",
+				"github.vscode-github-actions"
+			],
+			"settings": {
+				"chat.disableAIFeatures": true,
+				"terminal.integrated.defaultProfile.linux": "zsh",
+				"terminal.integrated.profiles.linux": {
+					"zsh": {
+						"path": "/usr/bin/zsh"
+					}
+				}
+			}
+		}
+	}
 }
