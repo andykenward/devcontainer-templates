@@ -47,7 +47,7 @@ COPY --chown=node:node zshrc /home/node/.zshrc
 # manager (matches `pnpm@<version>`).
 ENV PNPM_HOME="/usr/local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-RUN npm install -g pnpm@11.21.0
+RUN npm install -g pnpm@11.22.0
 
 # cosign — copied as a digest-pinned binary out of Sigstore's official image,
 # the same trust model as prek below: no install script runs at build time, and
