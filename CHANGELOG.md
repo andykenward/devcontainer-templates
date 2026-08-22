@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.3.0](https://github.com/andykenward/devcontainer-templates/compare/v3.2.0...v3.3.0) (2026-08-22)
+
+
+### Features
+
+* add vscode extension github.vscode-pull-request-github ([196891f](https://github.com/andykenward/devcontainer-templates/commit/196891fda82275592470ddfd5b602a7265b06b06))
+* **deps:** update dependency @anthropic-ai/claude-code to v2.1.231 ([#74](https://github.com/andykenward/devcontainer-templates/issues/74)) ([d20c397](https://github.com/andykenward/devcontainer-templates/commit/d20c39769177726df6e5b9393cd715a558f2d1d3))
+* **deps:** update dependency @anthropic-ai/claude-code to v2.1.234 ([#83](https://github.com/andykenward/devcontainer-templates/issues/83)) ([9c092dc](https://github.com/andykenward/devcontainer-templates/commit/9c092dca0fc9a089a90411c3e16f209824736ba2))
+* **deps:** update dependency pnpm to v11.21.0 ([#79](https://github.com/andykenward/devcontainer-templates/issues/79)) ([e0d5955](https://github.com/andykenward/devcontainer-templates/commit/e0d5955db6a89a7b42a26afb0b3e1a0e793e375c))
+* **deps:** update dependency pnpm to v11.22.0 ([#86](https://github.com/andykenward/devcontainer-templates/issues/86)) ([15ae2b4](https://github.com/andykenward/devcontainer-templates/commit/15ae2b4cc3aff0eaae7e6837504aa74e8ffe5c6d))
+
 ## [3.2.0](https://github.com/andykenward/devcontainer-templates/compare/v3.1.0...v3.2.0) (2026-08-08)
 
 

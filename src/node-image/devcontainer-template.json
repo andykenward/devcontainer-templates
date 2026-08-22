@@ -1,6 +1,6 @@
 {
   "id": "node-image",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "name": "Node (prebuilt image) — pinned toolchain, provenance-verified, with Claude Code",
   "description": "The `node` template's toolchain as a prebuilt, signed, multi-arch image: pnpm, prek, a GitHub CLI verified via SLSA build provenance (cosign), zsh and the Claude Code CLI. No local build — the config, extensions and lifecycle commands travel with the image. Ships an optional renovate.json wired to a shared preset.",
   "documentationURL": "https://github.com/andykenward/devcontainer-templates/tree/main/src/node-image",
