@@ -140,7 +140,7 @@ jobs:
       # `npm install -g @devcontainers/cli@<version>`, and an ${ENV} reference
       # would make it capture the variable name and drop the dependency.
       - name: Install devcontainer CLI
-        run: npm install -g @devcontainers/cli@0.88.0
+        run: npm install -g @devcontainers/cli@0.89.0
 
       - name: Add OCI labels to a scratch copy of the build context
         env:
