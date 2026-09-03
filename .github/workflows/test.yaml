@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
 
       - name: "Install devcontainer CLI"
-        run: npm install -g @devcontainers/cli@0.88.0
+        run: npm install -g @devcontainers/cli@0.89.0
 
       - name: "Generating tests for '${{ matrix.templates }}'"
         run: echo "${TEMPLATE_ID}"
