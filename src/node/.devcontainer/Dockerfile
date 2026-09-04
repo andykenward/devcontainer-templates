@@ -90,7 +90,7 @@ COPY --from=ghcr.io/sigstore/cosign/cosign:v3.1.2@sha256:d91bc4e7e95e8d2f549c747
 #   - If cli/cli change their release workflow path/ref, a version bump will
 #     fail verification here — update --certificate-identity to match.
 ARG TARGETARCH
-ARG GH_VERSION=2.97.0
+ARG GH_VERSION=2.99.0
 RUN set -eux; \
     arch="${TARGETARCH:?TARGETARCH is empty — see the note above about ARG scope}"; \
     tarball="gh_${GH_VERSION}_linux_${arch}.tar.gz"; \
