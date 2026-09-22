@@ -3,7 +3,7 @@
 # Base image pinned by digest for reproducibility. Bumping the node version
 # means updating both the tag and the digest — Renovate's Dockerfile manager
 # does both together in one PR.
-FROM node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
+FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
 
 # System packages. Individual versions are not pinned — the digest-pinned base
 # image plus Docker's layer cache provide reproducibility in practice.
